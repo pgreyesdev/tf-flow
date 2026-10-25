@@ -114,6 +114,7 @@ def test_today_uses_the_canary_islands_clock() -> None:
         ("  tf1  los cristianos ", "TF1 Los Cristianos"),
         ("LA LAGUNA - TEJINA", "La Laguna - Tejina"),
         ("PUERTO DE LA CRUZ", "Puerto de la Cruz"),
+        ("DEPURADORA S/C", "Depuradora S/C"),
         ("DÁRSENA PESQUERA", "Dársena Pesquera"),
         ("ACCESO AL PUERTO POR LA TF-24", "Acceso al Puerto por la TF-24"),
     ],

@@ -30,7 +30,8 @@ class DateOutOfRangeError(ValueError):
 
 
 ROAD_CODE = re.compile(r"^[A-Z]{1,3}-?\d+[A-Z]?$")
-"""Códigos de vía como ``TF-5`` o ``TF1``, que se dejan en mayúsculas."""
+"""Códigos de vía como ``TF-5`` o ``TF1``, que se dejan en mayúsculas, igual que abreviaturas como
+``S/C``."""
 PREPOSITIONS = frozenset({"a", "al", "de", "del", "en", "por", "y"})
 ARTICLES = frozenset({"el", "la", "las", "los"})
 
@@ -44,7 +45,7 @@ def readable_name(raw: str) -> str:
     for word in raw.split():
         lower = word.lower()
         after_preposition = bool(readable) and readable[-1] in PREPOSITIONS
-        if ROAD_CODE.match(word.upper()):
+        if ROAD_CODE.match(word.upper()) or "/" in word:
             readable.append(word.upper())
         elif readable and (lower in PREPOSITIONS or (lower in ARTICLES and after_preposition)):
             readable.append(lower)
