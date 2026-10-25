@@ -2,13 +2,15 @@ import datetime as dt
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
+import pandas as pd
 import pytest
 from fastapi.testclient import TestClient
 
 from tf_flow_api.core.config import Environment, Settings
 from tf_flow_api.main import load_forecast_service
-from tf_flow_api.services.forecast import readable_name, today_in_tenerife
+from tf_flow_api.services.forecast import ForecastService, readable_name, today_in_tenerife
 from tf_flow_ml.serving.bundle import ServingBundle, save_bundle
+from tf_flow_ml.serving.predictor import HourlyForecast
 
 from .conftest import TODAY
 
@@ -121,3 +123,25 @@ def test_today_uses_the_canary_islands_clock() -> None:
 )
 def test_station_names_are_readable(raw: str, expected: str) -> None:
     assert readable_name(raw) == expected
+
+
+def test_each_day_is_predicted_once(
+    forecast: ForecastService, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    calls: list[tuple[int, int]] = []
+    predict = forecast.predictor.predict
+
+    def counting(
+        station_id: int, direction: int, hours: list[pd.Timestamp]
+    ) -> list[HourlyForecast]:
+        calls.append((station_id, direction))
+        return predict(station_id, direction, hours)
+
+    monkeypatch.setattr(forecast.predictor, "predict", counting)
+    station = forecast.stations()[0]
+    first = forecast.day_forecast(station.station_id, station.direction, TODAY)
+    again = forecast.day_forecast(station.station_id, station.direction, None)
+    assert again == first
+    assert len(calls) == 1
+    forecast.day_forecast(station.station_id, station.direction, TODAY + dt.timedelta(days=1))
+    assert len(calls) == 2

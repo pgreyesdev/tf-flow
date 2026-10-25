@@ -82,7 +82,8 @@ navegador nunca ve la dirección de la API ni el token del asistente.
 
 ### API en Fly.io
 
-`fly.toml` describe la máquina (1 GB, París, se para sin tráfico) y monta el volumen `models` en
+`fly.toml` describe la máquina (1 GB, París, se suspende sin tráfico y vuelve en menos de un
+segundo con el modelo ya cargado) y monta el volumen `models` en
 `/models`. La primera vez:
 
 ```bash
@@ -110,3 +111,5 @@ Directorio raíz `web` y estas variables de entorno de producción:
 | `TFFLOW_SITE_URL` | La URL pública de la web |
 
 Vercel fija `X-Real-IP`, que la web usa para limitar las preguntas al asistente por visitante.
+`web/vercel.json` ejecuta la web en París (`cdg1`), junto a la API: cada página hace hasta ocho
+consultas y desde la región por defecto, en Washington, cada una cruzaría el Atlántico.

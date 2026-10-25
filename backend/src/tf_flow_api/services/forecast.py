@@ -4,6 +4,7 @@ import datetime as dt
 import re
 from collections.abc import Callable
 from dataclasses import asdict
+from functools import lru_cache
 from zoneinfo import ZoneInfo
 
 import pandas as pd
@@ -67,6 +68,10 @@ def today_in_tenerife() -> dt.date:
     return dt.datetime.now(ZoneInfo(TIMEZONE)).date()
 
 
+#: Días por estación y sentido que caben en caché: de sobra para toda la red y el rango servido.
+CACHE_SIZE = 4096
+
+
 class ForecastService:
     def __init__(
         self,
@@ -77,6 +82,9 @@ class ForecastService:
         self.predictor = predictor
         self.max_days = max_days
         self.today = today
+        # El modelo no cambia mientras el proceso vive, así que cada día se calcula una sola vez.
+        # Las páginas piden la semana entera de golpe y explicar cada hora con SHAP es lo más caro.
+        self._predict_day = lru_cache(maxsize=CACHE_SIZE)(self._compute_day)
         catalogue = predictor.bundle.stations
         self._stations: dict[tuple[int, int], Station] = {
             (station.station_id, station.direction): station
@@ -109,6 +117,10 @@ class ForecastService:
                 f"Solo hay previsiones desde hace una semana hasta el {last.isoformat()}"
             )
 
+        return self._predict_day(station_id, direction, date)
+
+    def _compute_day(self, station_id: int, direction: int, date: dt.date) -> DayForecast:
+        station = self._stations[(station_id, direction)]
         hours = list(pd.date_range(pd.Timestamp(date), periods=24, freq="h"))
         forecasts = [
             HourlyForecast(
