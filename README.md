@@ -28,6 +28,7 @@ cp .env.example .env
 make install
 make check
 make api      # http://localhost:8000/docs
+make web      # http://localhost:3000
 ```
 
 Con Docker: `make up`. Más detalles en la [guía de desarrollo](docs/desarrollo.md).

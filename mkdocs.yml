@@ -33,3 +33,4 @@ nav:
       - adr/0007-modelo-en-servicio.md
       - adr/0008-asistente-claude.md
       - adr/0009-asistente-openai.md
+      - adr/0010-web-nextjs.md

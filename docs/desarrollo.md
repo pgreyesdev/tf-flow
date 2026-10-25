@@ -3,6 +3,7 @@
 ## Requisitos
 
 - [uv](https://docs.astral.sh/uv/) (instala Python 3.12 si hace falta)
+- Node.js 22 y [pnpm](https://pnpm.io/) 10, para la web
 - Docker, para el entorno completo con base de datos
 
 ## Primeros pasos
@@ -12,7 +13,11 @@ cp .env.example .env
 make install   # dependencias y hooks de pre-commit
 make check     # lint, tipos y tests, lo mismo que el CI
 make api       # API en http://localhost:8000/docs
+make web       # web en http://localhost:3000, contra la API local
 ```
+
+La web lee su configuración de `web/.env.local` (copia `web/.env.example`). Sus comprobaciones son
+`make web-check`: ESLint, Prettier, tipos y tests.
 
 ## Flujo de trabajo
 
@@ -22,8 +27,8 @@ make api       # API en http://localhost:8000/docs
 
 ## Calidad mínima
 
-- Cobertura de tests de al menos el 90 %; el CI falla por debajo.
-- `mypy --strict` sin errores.
+- Cobertura de tests de al menos el 90 %, en Python y en la web; el CI falla por debajo.
+- `mypy --strict` y TypeScript estricto sin errores.
 - Ninguna vulnerabilidad alta o crítica en la imagen Docker.
 
 ## Datos
