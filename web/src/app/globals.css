@@ -161,8 +161,7 @@
         background: var(--glass);
         border: 1px solid var(--glass-line);
         border-radius: 1.5rem;
-        backdrop-filter: blur(24px) saturate(140%);
-        -webkit-backdrop-filter: blur(24px) saturate(140%);
+        @apply backdrop-blur-[24px] backdrop-saturate-[140%];
     }
 
     .scroll-x {

@@ -16,6 +16,9 @@ const nextConfig: NextConfig = {
   // La CSP usa un nonce por petición (ver src/proxy.ts), incompatible con el prerenderizado
   // parcial de Cache Components. Ver docs/adr/0010-web-nextjs.md.
   cacheComponents: false,
+  // Con un identificador por despliegue, una pestaña abierta antes de publicar recarga entera al
+  // navegar en vez de mezclar páginas nuevas con los estilos de la versión anterior.
+  deploymentId: process.env.VERCEL_DEPLOYMENT_ID,
   output: "standalone",
   poweredByHeader: false,
   reactStrictMode: true,
