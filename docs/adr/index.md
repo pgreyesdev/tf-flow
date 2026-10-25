@@ -10,3 +10,4 @@ consecuencias. Un ADR aceptado no se edita: si la decisión cambia, se escribe o
 | [0003](0003-validacion-temporal-y-baseline.md) | Validación temporal y baseline obligatorio | Aceptada |
 | [0004](0004-app-android-nativa.md) | App Android nativa con Kotlin y Jetpack Compose | Aceptada |
 | [0005](0005-convenciones.md) | Idioma del código y convenciones | Aceptada |
+| [0006](0006-indice-de-congestion.md) | Índice de congestión basado en la velocidad | Propuesta |

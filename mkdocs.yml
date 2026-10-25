@@ -28,3 +28,4 @@ nav:
       - adr/0003-validacion-temporal-y-baseline.md
       - adr/0004-app-android-nativa.md
       - adr/0005-convenciones.md
+      - adr/0006-indice-de-congestion.md

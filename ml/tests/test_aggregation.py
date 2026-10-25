@@ -1,7 +1,12 @@
 import pandas as pd
 import pytest
 
-from tf_flow_ml.processing.aggregation import BIN_COLUMNS, SchemaError, aggregate_hourly
+from tf_flow_ml.processing.aggregation import (
+    BIN_COLUMNS,
+    SchemaError,
+    aggregate_hourly,
+    is_mainline,
+)
 
 
 def test_lanes_of_the_same_direction_are_summed(raw_traffic: pd.DataFrame) -> None:
@@ -47,3 +52,21 @@ def test_range_bins_are_summed_per_direction(raw_traffic: pd.DataFrame) -> None:
     row = hourly[(hourly["timestamp"] == "2026-03-02 08:00") & (hourly["direction"] == 1)]
     assert row[BIN_COLUMNS].to_numpy().tolist() == [[0, 15, 150, 0, 0, 0]]
     assert (hourly[BIN_COLUMNS].sum(axis=1) == hourly["vehicles"]).all()
+
+
+def test_mainline_only_drops_ramps(raw_traffic: pd.DataFrame) -> None:
+    hourly = aggregate_hourly(raw_traffic, mainline_only=True)
+
+    row = hourly[(hourly["timestamp"] == "2026-03-02 08:00") & (hourly["direction"] == 1)]
+    assert row["vehicles"].item() == 110
+
+
+def test_mainline_only_needs_lane_descriptions(raw_traffic: pd.DataFrame) -> None:
+    with pytest.raises(SchemaError, match="carril_descripcion"):
+        aggregate_hourly(raw_traffic.drop(columns=["carril_descripcion"]), mainline_only=True)
+
+
+def test_is_mainline() -> None:
+    lanes = pd.Series(["Añaza C. Lento", "Acceso de Añaza", "Carril Bus", None, "SALIDA X"])
+
+    assert is_mainline(lanes).tolist() == [True, False, False, True, False]

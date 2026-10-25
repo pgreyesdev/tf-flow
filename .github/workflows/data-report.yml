@@ -39,12 +39,19 @@ jobs:
           uv run python ml/analysis/congestion_eda.py "$snapshot" > analisis-congestion.md
           cat analisis-congestion.md >> "$GITHUB_STEP_SUMMARY"
           cat analisis-congestion.md
+      - name: Validación del índice de congestión
+        run: |
+          snapshot=$(ls -d data/raw/traffic/*/ | tail -n 1)
+          uv run python ml/analysis/congestion_labels.py "$snapshot" > validacion-congestion.md
+          cat validacion-congestion.md >> "$GITHUB_STEP_SUMMARY"
+          cat validacion-congestion.md
       - uses: actions/upload-artifact@v7
         with:
           name: informe-datos
           path: |
             informe-datos.md
             analisis-congestion.md
+            validacion-congestion.md
       - uses: actions/upload-artifact@v7
         with:
           name: instantanea-trafico
