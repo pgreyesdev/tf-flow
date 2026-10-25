@@ -1,0 +1,44 @@
+name: Informe de datos
+
+# Descarga una instantánea del portal del Cabildo y publica el informe de calidad en el resumen de
+# la ejecución. La instantánea queda como artefacto para trabajar con ella en local.
+on:
+  workflow_dispatch:
+    inputs:
+      years:
+        description: "Años a descargar, por ejemplo 2026 o 2019-2026"
+        required: true
+        default: "2019-2026"
+
+permissions:
+  contents: read
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+      - run: uv sync --frozen --python 3.12
+      - name: Descargar instantánea
+        env:
+          YEARS: ${{ inputs.years }}
+        run: uv run python -m tf_flow_ml.ingestion traffic --years "$YEARS" --out data/raw
+      - name: Generar informe
+        run: |
+          snapshot=$(ls -d data/raw/traffic/*/ | tail -n 1)
+          uv run python -m tf_flow_ml.reports.profile "$snapshot" --out informe-datos.md
+          cat informe-datos.md >> "$GITHUB_STEP_SUMMARY"
+          cat informe-datos.md
+      - uses: actions/upload-artifact@v7
+        with:
+          name: informe-datos
+          path: informe-datos.md
+      - uses: actions/upload-artifact@v7
+        with:
+          name: instantanea-trafico
+          path: data/raw/traffic
+          retention-days: 30

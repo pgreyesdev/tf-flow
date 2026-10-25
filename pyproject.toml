@@ -53,7 +53,7 @@ mypy_path = ["backend/src", "ml/src"]
 packages = ["tf_flow_api", "tf_flow_ml"]
 
 [[tool.mypy.overrides]]
-module = ["sklearn.*"]
+module = ["sklearn.*", "pyarrow.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]
