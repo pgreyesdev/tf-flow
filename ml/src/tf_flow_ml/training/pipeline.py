@@ -90,14 +90,19 @@ def tune_high_threshold(
 
 
 def predict_high_probability(model: Any, features: pd.DataFrame) -> np.ndarray:
-    position = list(model.classes_).index(Level.HIGH)
-    return np.asarray(model.predict_proba(features))[:, position]
+    """Probabilidad de ``high``; cero si el modelo nunca vio un atasco fuerte al entrenar."""
+    classes = list(model.classes_)
+    if Level.HIGH not in classes:
+        return np.zeros(len(features))
+    return np.asarray(model.predict_proba(features))[:, classes.index(Level.HIGH)]
 
 
 def predict_with_threshold(model: Any, features: pd.DataFrame, threshold: float) -> np.ndarray:
     """``high`` si su probabilidad supera el umbral; si no, la clase más probable entre el resto."""
     probabilities = np.asarray(model.predict_proba(features))
     classes = np.asarray(model.classes_, dtype=object)
+    if Level.HIGH not in list(classes):
+        return classes[probabilities.argmax(axis=1)]
     high = list(classes).index(Level.HIGH)
     rest = probabilities.copy()
     rest[:, high] = -1

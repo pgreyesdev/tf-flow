@@ -15,6 +15,7 @@ from tf_flow_ml.training.pipeline import (
     TrainingConfig,
     TrainingResult,
     label_by_year,
+    predict_high_probability,
     predict_with_threshold,
     train_and_evaluate,
     tune_high_threshold,
@@ -165,3 +166,17 @@ def test_threshold_needs_more_than_a_year_of_training(hourly: pd.DataFrame) -> N
 
     with pytest.raises(ValueError, match="umbral"):
         train_and_evaluate(recent, FAST)
+
+
+def test_models_without_heavy_congestion_never_flag_it() -> None:
+    class Calm:
+        classes_ = np.array(["low", "medium"], dtype=object)
+
+        def predict_proba(self, _: pd.DataFrame) -> np.ndarray:
+            return np.array([[0.7, 0.3], [0.2, 0.8]])
+
+    features = pd.DataFrame(index=range(2))
+
+    assert predict_with_threshold(Calm(), features, 0.1).tolist() == ["low", "medium"]
+    assert predict_high_probability(Calm(), features).tolist() == [0, 0]
+    assert (shap_values(Calm(), features, "high") == 0).all().all()

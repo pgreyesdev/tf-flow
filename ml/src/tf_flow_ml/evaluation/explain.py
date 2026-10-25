@@ -13,6 +13,8 @@ import pandas as pd
 
 def shap_values(model: Any, features: pd.DataFrame, class_name: str | None = None) -> pd.DataFrame:
     """Contribución de cada variable a cada predicción. En un clasificador, la de ``class_name``."""
+    if class_name is not None and class_name not in list(model.classes_):
+        return pd.DataFrame(0.0, columns=features.columns, index=features.index)
     contributions = np.asarray(model.predict(features, pred_contrib=True))
     width = features.shape[1] + 1
     if class_name is not None:

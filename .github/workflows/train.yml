@@ -59,6 +59,8 @@ jobs:
             --serving-bundle artifacts/serving.joblib
           cat artifacts/entrenamiento.md >> "$GITHUB_STEP_SUMMARY"
           cat artifacts/entrenamiento.md
+      - name: Probar la API con el modelo
+        run: uv run python backend/scripts/smoke_test.py artifacts/serving.joblib
       - uses: actions/upload-artifact@v7
         with:
           name: modelos
