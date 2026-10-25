@@ -9,7 +9,7 @@ from tf_flow_ml.evaluation.metrics import ClassificationReport
 from tf_flow_ml.models.baseline import NotFittedError
 from tf_flow_ml.processing.aggregation import BIN_COLUMNS, add_calendar_features
 from tf_flow_ml.training import __main__ as cli
-from tf_flow_ml.training.features import FEATURES, FeatureBuilder
+from tf_flow_ml.training.features import FEATURES, FeatureBuilder, recent_profile
 from tf_flow_ml.training.pipeline import (
     TrainingConfig,
     TrainingResult,
@@ -107,3 +107,29 @@ def test_cli_writes_report_and_models(
     assert "NORTE" in (tmp_path / "out" / "entrenamiento.md").read_text(encoding="utf-8")
     bundle = joblib.load(tmp_path / "out" / "modelos.joblib")
     assert set(bundle["models"]) == {"volume_lightgbm", "level_lightgbm", "level_lightgbm_balanced"}
+
+
+def test_recent_profile_only_sees_published_data() -> None:
+    stamps = pd.date_range("2025-01-01 08:00", periods=120, freq="D")
+    history = pd.DataFrame(
+        {
+            "timestamp": stamps,
+            "station_id": 1,
+            "direction": 1,
+            "hour": 8,
+            "is_weekend": False,
+            "vehicles": np.where(stamps < pd.Timestamp("2025-03-01"), 100.0, 500.0),
+            "level": np.where(stamps < pd.Timestamp("2025-03-01"), "low", "high"),
+        }
+    )
+    target = history[history["timestamp"].dt.strftime("%m-%d").isin(["03-10", "04-29"])]
+    newcomer = target.head(1).assign(station_id=2)
+
+    recent = recent_profile(pd.concat([target, newcomer]), history, lag_days=45, window_days=28)
+
+    # El 10/03 solo se conoce hasta el 24/01; el 29/04, del 16/02 al 15/03 (15 días a 500).
+    assert recent["recent_vehicles"].iloc[0] == pytest.approx(100)
+    assert recent["recent_vehicles"].iloc[1] == pytest.approx((13 * 100 + 15 * 500) / 28)
+    assert recent["recent_high"].iloc[0] == 0
+    assert recent["recent_high"].iloc[1] == pytest.approx(15 / 28)
+    assert recent.iloc[2].isna().all()

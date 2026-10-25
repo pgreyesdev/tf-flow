@@ -51,9 +51,9 @@ Compara el baseline histórico con Random Forest y LightGBM en dos tareas: el vo
 nivel de congestión del [ADR 0006](adr/0006-indice-de-congestion.md). Deja en `artifacts/` el
 informe `entrenamiento.md` y los modelos en `modelos.joblib`.
 
-Los modelos solo usan variables conocidas para cualquier fecha futura: calendario, festivos de
-Tenerife (nacionales, de Canarias y la Candelaria), puentes y el perfil histórico de cada estación.
-El Cabildo publica los datos con un mes de retraso, así que el tráfico reciente no sirve como
-variable en el momento de predecir.
+Los modelos usan el calendario, los festivos de Tenerife (nacionales, de Canarias y la Candelaria),
+los puentes y el perfil histórico de cada estación. También reciben cómo fue el tráfico a esa misma
+hora en las cuatro semanas que terminaron 45 días antes. El Cabildo publica los datos con retraso,
+así que el modelo nunca usa datos que no estarían publicados en el momento de predecir.
 
 En GitHub, el flujo **Entrenamiento** hace lo mismo con la última instantánea descargada.

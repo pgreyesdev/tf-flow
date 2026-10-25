@@ -82,7 +82,8 @@ def train_and_evaluate(hourly: pd.DataFrame, config: TrainingConfig) -> Training
     train = train[~in_lockdown(train["timestamp"])]
 
     features = FeatureBuilder().fit(train)
-    x_train, x_test = features.transform(train), features.transform(test)
+    x_train = features.transform(train, history=data)
+    x_test = features.transform(test, history=data)
     rf_options: dict[str, Any] = {
         "n_estimators": config.n_estimators // 2,
         "min_samples_leaf": 10,
