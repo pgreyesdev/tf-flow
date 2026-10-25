@@ -32,9 +32,10 @@ Los experimentos trabajan sobre instantáneas locales del portal del Cabildo, nu
 contra la API:
 
 ```bash
-uv run python -m tf_flow_ml.ingestion traffic    # aforos -> data/raw/traffic/AAAAMMDD/
+uv run python -m tf_flow_ml.ingestion traffic    # aforos 2019-2026 -> data/raw/traffic/AAAAMMDD/
+uv run python -m tf_flow_ml.ingestion traffic --years 2025-2026   # solo esos años
 uv run python -m tf_flow_ml.ingestion stations   # catálogo de estaciones
 ```
 
-Cada instantánea guarda `data.parquet` y un `manifest.json` con los ficheros de origen, la fecha de
+Cada instantánea guarda un Parquet por fichero mensual y un `manifest.json` con el origen, la fecha de
 descarga, el número de filas y las columnas. La carpeta `data/` no se versiona.

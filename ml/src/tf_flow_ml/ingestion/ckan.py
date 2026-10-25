@@ -1,7 +1,8 @@
 """Cliente del portal de datos abiertos del Cabildo de Tenerife (CKAN).
 
-Un paquete de CKAN puede tener varios recursos del mismo formato, por ejemplo un fichero por año.
-Por eso el cliente devuelve todos los recursos que coinciden en vez de quedarse con el primero.
+El Cabildo publica la intensidad de tráfico como un paquete por año y, dentro de cada paquete, un
+fichero por mes. Por eso el cliente devuelve todos los recursos que coinciden en vez de quedarse
+con el primero.
 """
 
 import io
@@ -15,7 +16,17 @@ import pandas as pd
 logger = logging.getLogger(__name__)
 
 TENERIFE_CKAN_URL: Final = "https://datos.tenerife.es/ckan"
-TRAFFIC_PACKAGE_ID: Final = "d02ccf54-aca2-4a82-9ef0-fbd285b5f401"
+TRAFFIC_PACKAGE_IDS: Final = {
+    2019: "d3cabcfa-e2dc-48c5-8203-3a254d4505d6",
+    2020: "49114bab-de2a-4541-9952-c53cd9c752f6",
+    2021: "24bd44b1-1a43-4182-bad5-8be793964941",
+    2022: "b5534fca-4dfd-4721-9407-24e2adf23150",
+    2023: "68d71276-ddf6-4be9-9cee-7f56637b71e7",
+    2024: "e4cf320e-dda5-4b9a-bae3-ec3d6a252c80",
+    2025: "94a021a2-1dea-4526-9e17-3290b3b9add3",
+    2026: "d02ccf54-aca2-4a82-9ef0-fbd285b5f401",
+}
+"""Paquete de intensidad de tráfico de cada año en el portal."""
 STATIONS_PACKAGE_ID: Final = "a114f82b-bb62-47e0-94bb-bebb484514a7"
 
 
