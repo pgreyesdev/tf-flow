@@ -1,0 +1,125 @@
+@import "tailwindcss";
+
+/*
+ * Sistema de diseño de TF-FLOW: servicio público, legible y de alto contraste.
+ * Azul noche y azul océano para la marca; verde, ámbar y rojo solo para el estado del tráfico,
+ * siempre acompañados de texto e icono. Todos los textos cumplen al menos 4,5:1 en ambos temas.
+ */
+
+:root {
+    color-scheme: light;
+    --background: #f8fafc;
+    --surface: #ffffff;
+    --surface-muted: #eef2f6;
+    --foreground: #020617;
+    --muted: #475569;
+    --border: #e2e8f0;
+    --border-strong: #cbd5e1;
+    --primary: #0f172a;
+    --on-primary: #ffffff;
+    --accent: #0369a1;
+    --accent-hover: #075985;
+    --on-accent: #ffffff;
+    --accent-soft: #e0f2fe;
+    --ring: #0369a1;
+    --low: #15803d;
+    --low-soft: #dcfce7;
+    --medium: #b45309;
+    --medium-soft: #fef3c7;
+    --high: #b91c1c;
+    --high-soft: #fee2e2;
+}
+
+@media (prefers-color-scheme: dark) {
+    :root {
+        color-scheme: dark;
+        --background: #020617;
+        --surface: #0b1324;
+        --surface-muted: #111c33;
+        --foreground: #f1f5f9;
+        --muted: #a3b1c6;
+        --border: #1e293b;
+        --border-strong: #334155;
+        --primary: #e2e8f0;
+        --on-primary: #020617;
+        --accent: #38bdf8;
+        --accent-hover: #7dd3fc;
+        --on-accent: #020617;
+        --accent-soft: #0c2a43;
+        --ring: #7dd3fc;
+        --low: #4ade80;
+        --low-soft: #0d2b1b;
+        --medium: #fbbf24;
+        --medium-soft: #33240a;
+        --high: #f87171;
+        --high-soft: #3b1212;
+    }
+}
+
+@theme inline {
+    --color-background: var(--background);
+    --color-surface: var(--surface);
+    --color-surface-muted: var(--surface-muted);
+    --color-foreground: var(--foreground);
+    --color-muted: var(--muted);
+    --color-border: var(--border);
+    --color-border-strong: var(--border-strong);
+    --color-primary: var(--primary);
+    --color-on-primary: var(--on-primary);
+    --color-accent: var(--accent);
+    --color-accent-hover: var(--accent-hover);
+    --color-on-accent: var(--on-accent);
+    --color-accent-soft: var(--accent-soft);
+    --color-ring: var(--ring);
+    --color-low: var(--low);
+    --color-low-soft: var(--low-soft);
+    --color-medium: var(--medium);
+    --color-medium-soft: var(--medium-soft);
+    --color-high: var(--high);
+    --color-high-soft: var(--high-soft);
+    --font-sans: var(--font-atkinson), ui-sans-serif, system-ui, sans-serif;
+    --font-mono: var(--font-atkinson-mono), ui-monospace, monospace;
+}
+
+@layer base {
+    html {
+        scroll-padding-top: 5rem;
+    }
+
+    body {
+        background: var(--background);
+        color: var(--foreground);
+        font-family: var(--font-sans);
+        font-size: 1.0625rem;
+        line-height: 1.6;
+        text-rendering: optimizeLegibility;
+    }
+
+    h1,
+    h2,
+    h3 {
+        text-wrap: balance;
+        line-height: 1.15;
+        letter-spacing: -0.015em;
+    }
+
+    p {
+        text-wrap: pretty;
+    }
+
+    :focus-visible {
+        outline: 3px solid var(--ring);
+        outline-offset: 3px;
+        border-radius: 6px;
+    }
+
+    @media (prefers-reduced-motion: no-preference) {
+        html {
+            scroll-behavior: smooth;
+        }
+    }
+}
+
+@utility tabular {
+    font-variant-numeric: tabular-nums;
+}

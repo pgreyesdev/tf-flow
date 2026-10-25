@@ -1,4 +1,4 @@
-# Entorno local completo: base de datos y API. Uso: docker compose up --build
+# Entorno local completo: base de datos, API y web. Uso: docker compose up --build
 services:
   db:
     image: postgres:17-alpine
@@ -25,6 +25,16 @@ services:
     depends_on:
       db:
         condition: service_healthy
+
+  web:
+    build: web
+    environment:
+      TFFLOW_API_URL: http://api:8000
+      TFFLOW_SITE_URL: http://localhost:3000
+    ports:
+      - "127.0.0.1:3000:3000"
+    depends_on:
+      - api
 
 volumes:
   db-data:
