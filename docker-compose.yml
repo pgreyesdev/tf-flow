@@ -1,0 +1,27 @@
+# Entorno local completo: base de datos y API. Uso: docker compose up --build
+services:
+  db:
+    image: postgres:17-alpine
+    env_file: .env
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      retries: 10
+
+  api:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    env_file: .env
+    ports:
+      - "127.0.0.1:8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  db-data:

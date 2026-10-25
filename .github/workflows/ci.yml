@@ -1,0 +1,60 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  python:
+    name: Python · lint, tipos y tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - run: uv sync --frozen --python 3.12
+      - name: Lint
+        run: uv run ruff check .
+      - name: Formato
+        run: uv run ruff format --check .
+      - name: Tipos
+        run: uv run mypy
+      - name: Tests y cobertura
+        run: uv run pytest --cov --cov-report=xml
+      - uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: coverage.xml
+
+  docker:
+    name: Imagen de la API
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Construir imagen
+        run: docker build -f backend/Dockerfile -t tf-flow-api:ci .
+      - name: Escanear vulnerabilidades
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: tf-flow-api:ci
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          exit-code: "1"
+
+  docs:
+    name: Documentación
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - run: uv sync --frozen --python 3.12 --only-group docs
+      - run: uv run --only-group docs mkdocs build --strict
