@@ -3,8 +3,9 @@
 from enum import StrEnum
 from functools import lru_cache
 from pathlib import Path
+from typing import Literal
 
-from pydantic import Field
+from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -27,6 +28,16 @@ class Settings(BaseSettings):
     max_forecast_days: int = Field(default=14, ge=1, le=60)
     rate_limit_per_minute: int = Field(default=60, ge=1)
     """Peticiones por minuto y cliente; ``/health`` no cuenta."""
+
+    anthropic_api_key: SecretStr | None = None
+    """Sin clave, el asistente está desactivado y su ruta responde 503."""
+    assistant_model: str = "claude-opus-5-5"
+    assistant_effort: Literal["low", "medium", "high"] = "low"
+    assistant_access_token: SecretStr | None = None
+    """Si se define, el asistente exige la cabecera ``X-Assistant-Token`` con este valor."""
+    assistant_daily_token_budget: int = Field(default=300_000, ge=1)
+    """Tokens (entrada y salida) que el asistente puede gastar al día entre todos los usuarios."""
+    assistant_rate_limit_per_minute: int = Field(default=6, ge=1)
 
     @property
     def docs_enabled(self) -> bool:

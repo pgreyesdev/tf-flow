@@ -30,3 +30,4 @@ nav:
       - adr/0004-app-android-nativa.md
       - adr/0005-convenciones.md
       - adr/0006-indice-de-congestion.md
+      - adr/0008-asistente-claude.md

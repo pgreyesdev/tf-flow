@@ -4,6 +4,7 @@ import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
+from anthropic import AsyncAnthropic
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -13,6 +14,7 @@ from tf_flow_api.core.config import Settings, get_settings
 from tf_flow_api.core.logging import configure_logging
 from tf_flow_api.core.rate_limit import RateLimiter, rate_limit_middleware
 from tf_flow_api.core.security import add_security_headers
+from tf_flow_api.services.assistant import AssistantService, TokenBudget
 from tf_flow_api.services.forecast import ForecastService
 from tf_flow_ml.serving.bundle import load_bundle
 from tf_flow_ml.serving.predictor import Predictor
@@ -32,16 +34,37 @@ def load_forecast_service(settings: Settings) -> ForecastService | None:
     return ForecastService(Predictor(bundle), settings.max_forecast_days)
 
 
+def build_assistant(
+    settings: Settings, forecast: ForecastService | None
+) -> AssistantService | None:
+    """El asistente necesita la clave de Anthropic y el modelo de previsión."""
+    if settings.anthropic_api_key is None or forecast is None:
+        return None
+    client = AsyncAnthropic(api_key=settings.anthropic_api_key.get_secret_value(), timeout=60)
+    return AssistantService(
+        client.beta.messages,
+        forecast,
+        model=settings.assistant_model,
+        effort=settings.assistant_effort,
+        budget=TokenBudget(settings.assistant_daily_token_budget),
+    )
+
+
 def create_app(
-    settings: Settings | None = None, forecast: ForecastService | None = None
+    settings: Settings | None = None,
+    forecast: ForecastService | None = None,
+    assistant: AssistantService | None = None,
 ) -> FastAPI:
-    """``forecast`` permite a los tests inyectar un servicio; si falta, se carga el modelo."""
+    """``forecast`` y ``assistant`` permiten a los tests inyectar servicios; si faltan, se crean
+    a partir de la configuración."""
     settings = settings or get_settings()
     configure_logging(settings.log_level)
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         app.state.forecast = forecast or load_forecast_service(settings)
+        app.state.assistant = assistant or build_assistant(settings, app.state.forecast)
+        app.state.assistant_limiter = RateLimiter(settings.assistant_rate_limit_per_minute)
         yield
 
     app = FastAPI(
@@ -58,7 +81,7 @@ def create_app(
         CORSMiddleware,
         allow_origins=settings.cors_origins,
         allow_methods=["GET", "POST"],
-        allow_headers=["Content-Type"],
+        allow_headers=["Content-Type", "X-Assistant-Token"],
     )
     app.middleware("http")(rate_limit_middleware(RateLimiter(settings.rate_limit_per_minute)))
     app.middleware("http")(add_security_headers)
