@@ -1,12 +1,13 @@
 from pathlib import Path
 
 import joblib
+import lightgbm as lgb
 import mlflow
 import numpy as np
 import pandas as pd
 import pytest
 
-from tf_flow_ml.evaluation.explain import shap_values
+from tf_flow_ml.evaluation.explain import shap_log_odds, shap_values
 from tf_flow_ml.evaluation.metrics import ClassificationReport
 from tf_flow_ml.models.baseline import NotFittedError
 from tf_flow_ml.training import __main__ as cli
@@ -159,6 +160,53 @@ def test_shap_values_add_up_to_the_prediction(result: TrainingResult) -> None:
     assert np.allclose(contributions.sum(axis=1) + bias, model.predict(rows))
     high = shap_values(result.models["level_lightgbm"], rows, "high")
     assert list(high.columns) == FEATURES
+
+
+def _bias_log_odds(model: lgb.LGBMClassifier, rows: pd.DataFrame, a: str, b: str) -> np.ndarray:
+    """Parte de las log-odds de ``a`` frente a ``b`` que no explica ninguna variable."""
+    proba = model.predict_proba(rows)
+    classes = list(model.classes_)
+    log_odds = np.log(proba[:, classes.index(a)] / proba[:, classes.index(b)])
+    return log_odds - shap_log_odds(model, rows, a, b).sum(axis=1).to_numpy()
+
+
+def _classifier(rows: pd.DataFrame, labels: np.ndarray) -> lgb.LGBMClassifier:
+    return lgb.LGBMClassifier(n_estimators=10, min_child_samples=5, verbose=-1).fit(rows, labels)
+
+
+@pytest.mark.parametrize("n_classes", [2, 3])
+@pytest.mark.parametrize(("positive", "reference"), [("high", "low"), ("low", "high")])
+def test_log_odds_explanations_add_up(
+    result: TrainingResult, n_classes: int, positive: str, reference: str
+) -> None:
+    rows = result.x_test.head(300)
+    labels = np.where(rows["hour"].isin([7, 8]), "high", "low")
+    if n_classes == 3:
+        labels = np.where(rows["hour"].isin([9, 14]), "medium", labels)
+    model = _classifier(rows, labels)
+
+    bias = _bias_log_odds(model, rows, positive, reference)
+
+    assert len(model.classes_) == n_classes
+    assert np.allclose(bias, bias[0])
+
+
+def test_binary_explanations_are_opposite_for_each_class(result: TrainingResult) -> None:
+    rows = result.x_test.head(300)
+    model = _classifier(rows, np.where(rows["hour"].isin([7, 8]), "high", "low"))
+
+    high = shap_values(model, rows, "high")
+
+    assert np.allclose(high, -shap_values(model, rows, "low"))
+    jam = rows["hour"] == 8
+    assert high.loc[jam, "hour"].mean() > 0
+
+
+def test_log_odds_need_both_classes(result: TrainingResult) -> None:
+    rows = result.x_test.head(5)
+    model = result.models["level_lightgbm"]
+
+    assert (shap_log_odds(model, rows, "high", "medium") == 0).all().all()
 
 
 def test_threshold_needs_more_than_a_year_of_training(hourly: pd.DataFrame) -> None:

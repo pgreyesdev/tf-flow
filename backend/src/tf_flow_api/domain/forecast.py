@@ -31,7 +31,10 @@ class Factor(BaseModel):
     feature: str
     label: str = Field(description="Explicación legible de la variable")
     contribution: float = Field(
-        description="Empuje hacia el atasco fuerte en log-odds: positivo lo hace más probable"
+        description=(
+            "Empuje hacia el atasco fuerte frente al tráfico fluido, en log-odds: "
+            "positivo lo hace más probable"
+        )
     )
 
 

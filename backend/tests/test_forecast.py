@@ -7,7 +7,7 @@ from fastapi.testclient import TestClient
 
 from tf_flow_api.core.config import Environment, Settings
 from tf_flow_api.main import load_forecast_service
-from tf_flow_api.services.forecast import today_in_tenerife
+from tf_flow_api.services.forecast import readable_name, today_in_tenerife
 from tf_flow_ml.serving.bundle import ServingBundle, save_bundle
 
 from .conftest import TODAY
@@ -105,3 +105,18 @@ def test_refuses_a_model_without_fingerprint(tmp_path: Path) -> None:
 
 def test_today_uses_the_canary_islands_clock() -> None:
     assert today_in_tenerife() == dt.datetime.now(ZoneInfo("Atlantic/Canary")).date()
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        ("TF-5 AUTOPISTA DEL NORTE", "TF-5 Autopista del Norte"),
+        ("  tf1  los cristianos ", "TF1 Los Cristianos"),
+        ("LA LAGUNA - TEJINA", "La Laguna - Tejina"),
+        ("PUERTO DE LA CRUZ", "Puerto de la Cruz"),
+        ("DÁRSENA PESQUERA", "Dársena Pesquera"),
+        ("ACCESO AL PUERTO POR LA TF-24", "Acceso al Puerto por la TF-24"),
+    ],
+)
+def test_station_names_are_readable(raw: str, expected: str) -> None:
+    assert readable_name(raw) == expected

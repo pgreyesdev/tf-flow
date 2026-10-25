@@ -15,6 +15,8 @@ La API sirve las previsiones del modelo final. Todas las rutas cuelgan de `/api/
 
 Cada hora trae los vehículos previstos, el nivel de congestión (`low`, `medium`, `high`), la
 probabilidad de atasco fuerte y los tres motivos que más pesan en esa probabilidad según SHAP.
+Cada motivo trae su contribución a las log-odds de atasco fuerte frente a tráfico fluido: positiva si
+acerca el atasco y negativa si lo aleja.
 `worst_hour` es la hora con más riesgo, la que la web y la app destacan.
 
 ```json

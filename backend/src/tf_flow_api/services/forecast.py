@@ -1,6 +1,7 @@
 """Casos de uso de previsión sobre el modelo empaquetado por ``tf_flow_ml``."""
 
 import datetime as dt
+import re
 from collections.abc import Callable
 from dataclasses import asdict
 from zoneinfo import ZoneInfo
@@ -28,12 +29,36 @@ class DateOutOfRangeError(ValueError):
     pass
 
 
+ROAD_CODE = re.compile(r"^[A-Z]{1,3}-?\d+[A-Z]?$")
+"""Códigos de vía como ``TF-5`` o ``TF1``, que se dejan en mayúsculas."""
+PREPOSITIONS = frozenset({"a", "al", "de", "del", "en", "por", "y"})
+ARTICLES = frozenset({"el", "la", "las", "los"})
+
+
+def readable_name(raw: str) -> str:
+    """``TF-5 PUERTO DE LA CRUZ`` → ``TF-5 Puerto de la Cruz``.
+
+    Los artículos solo van en minúscula tras una preposición: «Los Cristianos» es un nombre propio.
+    """
+    readable: list[str] = []
+    for word in raw.split():
+        lower = word.lower()
+        after_preposition = bool(readable) and readable[-1] in PREPOSITIONS
+        if ROAD_CODE.match(word.upper()):
+            readable.append(word.upper())
+        elif readable and (lower in PREPOSITIONS or (lower in ARTICLES and after_preposition)):
+            readable.append(lower)
+        else:
+            readable.append(word.capitalize())
+    return " ".join(readable)
+
+
 def _station(station_id: int, direction: int, name: str) -> Station:
     return Station(
         station_id=station_id,
         direction=direction,
         direction_label=DIRECTION_LABELS[direction],
-        name=name.strip().title(),
+        name=readable_name(name),
     )
 
 

@@ -6,7 +6,7 @@ from typing import Final
 import numpy as np
 import pandas as pd
 
-from tf_flow_ml.evaluation.explain import shap_values
+from tf_flow_ml.evaluation.explain import shap_log_odds
 from tf_flow_ml.processing.aggregation import add_calendar_features
 from tf_flow_ml.processing.congestion import Level
 from tf_flow_ml.serving.bundle import ServingBundle
@@ -76,7 +76,7 @@ class Predictor:
         model = self.bundle.level_model
         levels = predict_with_threshold(model, x, self.bundle.high_threshold)
         probability = predict_high_probability(model, x)
-        contributions = shap_values(model, x, Level.HIGH)
+        contributions = shap_log_odds(model, x, Level.HIGH, Level.LOW)
 
         forecasts = []
         for i, timestamp in enumerate(frame["timestamp"]):
