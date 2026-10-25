@@ -11,5 +11,6 @@ consecuencias. Un ADR aceptado no se edita: si la decisión cambia, se escribe o
 | [0004](0004-app-android-nativa.md) | App Android nativa con Kotlin y Jetpack Compose | Aceptada |
 | [0005](0005-convenciones.md) | Idioma del código y convenciones | Aceptada |
 | [0006](0006-indice-de-congestion.md) | Índice de congestión basado en la velocidad | Aceptada |
+| [0007](0007-modelo-en-servicio.md) | LightGBM como modelo en servicio | Aceptada |
 | [0008](0008-asistente-claude.md) | Asistente conversacional con Claude y herramientas | Sustituida por 0009 |
 | [0009](0009-asistente-openai.md) | Asistente conversacional con OpenAI y herramientas | Aceptada |
