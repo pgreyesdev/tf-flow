@@ -1,6 +1,6 @@
 # ADR 0008 · Asistente conversacional con Claude y herramientas
 
-- **Estado:** aceptada
+- **Estado:** sustituida por el [ADR 0009](0009-asistente-openai.md)
 - **Fecha:** 2026-10-25
 
 ## Contexto

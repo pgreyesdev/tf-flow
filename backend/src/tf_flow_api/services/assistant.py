@@ -1,4 +1,4 @@
-"""Asistente de TF-FLOW: Claude responde preguntas sobre el tráfico consultando el modelo.
+"""Asistente de TF-FLOW: un modelo de OpenAI responde preguntas consultando la previsión.
 
 El bucle de herramientas es manual para controlar el gasto: cada conversación tiene un máximo de
 rondas, cada respuesta un máximo de tokens y el servicio un presupuesto diario compartido.
@@ -11,17 +11,9 @@ import unicodedata
 from collections.abc import Callable
 from typing import Any, Literal, cast
 
-import anthropic
-from anthropic.resources.beta.messages import AsyncMessages
-from anthropic.types.beta import (
-    BetaAssistantMessageParam,
-    BetaMessage,
-    BetaMessageParam,
-    BetaSystemMessageParam,
-    BetaToolParam,
-    BetaToolResultBlockParam,
-    BetaUserMessageParam,
-)
+import openai
+from openai.resources.responses import AsyncResponses
+from openai.types.responses import FunctionToolParam, Response, ResponseInputItemParam
 from pydantic import BaseModel, Field, ValidationError
 
 from tf_flow_api.domain.chat import ChatMessage, ChatReply
@@ -37,7 +29,6 @@ logger = logging.getLogger(__name__)
 Effort = Literal["low", "medium", "high"]
 MAX_TOOL_ROUNDS = 6
 MAX_OUTPUT_TOKENS = 4_096
-FALLBACK_BETA = "server-side-fallback-2026-07-01"
 WEEKDAYS = ("lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo")
 
 SYSTEM_PROMPT = """\
@@ -61,12 +52,13 @@ UNAVAILABLE_REPLY = (
 )
 
 
-def _tool(name: str, description: str, properties: dict[str, Any]) -> BetaToolParam:
+def _tool(name: str, description: str, properties: dict[str, Any]) -> FunctionToolParam:
     return {
+        "type": "function",
         "name": name,
         "description": description,
         "strict": True,
-        "input_schema": {
+        "parameters": {
             "type": "object",
             "properties": properties,
             "required": list(properties),
@@ -75,7 +67,7 @@ def _tool(name: str, description: str, properties: dict[str, Any]) -> BetaToolPa
     }
 
 
-TOOLS: list[BetaToolParam] = [
+TOOLS: list[FunctionToolParam] = [
     _tool(
         "find_stations",
         "Busca estaciones de aforo por nombre o lugar (por ejemplo 'Cristianos' o 'Guamasa'). "
@@ -111,7 +103,7 @@ class _DayForecast(BaseModel):
 
 
 class AssistantUnavailableError(RuntimeError):
-    """Claude no está disponible o se agotó el presupuesto; la API responde 503."""
+    """El proveedor del modelo no está disponible o se agotó el presupuesto; la API responde 503."""
 
 
 def _fold(text: str) -> str:
@@ -142,16 +134,28 @@ class TokenBudget:
         self._spent += tokens
 
 
+def _refused(response: Response) -> bool:
+    """El modelo se negó a responder o la respuesta quedó incompleta por el filtro de contenido."""
+    if response.incomplete_details and response.incomplete_details.reason == "content_filter":
+        return True
+    return any(
+        part.type == "refusal"
+        for item in response.output
+        if item.type == "message"
+        for part in item.content
+    )
+
+
 class AssistantService:
     def __init__(
         self,
-        messages: AsyncMessages,
+        responses: AsyncResponses,
         forecast: ForecastService,
         model: str,
         effort: Effort,
         budget: TokenBudget,
     ) -> None:
-        self.messages = messages
+        self.responses = responses
         self.forecast = forecast
         self.model = model
         self.effort = effort
@@ -161,55 +165,50 @@ class AssistantService:
         if self.budget.exhausted():
             raise AssistantUnavailableError("El asistente ha agotado su presupuesto de hoy")
         today = self.forecast.today()
-        conversation: list[BetaMessageParam] = [
-            BetaUserMessageParam(role="user", content=m.content)
-            if m.role == "user"
-            else BetaAssistantMessageParam(role="assistant", content=m.content)
-            for m in history
+        conversation: list[ResponseInputItemParam] = [
+            {"type": "message", "role": m.role, "content": m.content} for m in history
         ]
-        # La fecha va en un mensaje de sistema al final para no romper la caché del prefijo.
+        # La fecha va al final para que el prefijo (instrucciones y herramientas) se cachee.
         conversation.append(
-            BetaSystemMessageParam(
-                role="system", content=f"Hoy es {WEEKDAYS[today.weekday()]} {today.isoformat()}."
-            )
+            {
+                "type": "message",
+                "role": "developer",
+                "content": f"Hoy es {WEEKDAYS[today.weekday()]} {today.isoformat()}.",
+            }
         )
         tools_used: list[str] = []
         tokens = 0
         for _ in range(MAX_TOOL_ROUNDS):
             response = await self._create(conversation)
-            usage = response.usage
-            tokens += (
-                usage.input_tokens
-                + usage.output_tokens
-                + (usage.cache_creation_input_tokens or 0)
-                + (usage.cache_read_input_tokens or 0)
-            )
-            if response.stop_reason == "refusal":
+            tokens += response.usage.total_tokens if response.usage else 0
+            if _refused(response):
                 self.budget.spend(tokens)
                 return ChatReply(reply=UNAVAILABLE_REPLY, tools_used=tools_used, tokens_used=tokens)
-            calls = [block for block in response.content if block.type == "tool_use"]
-            if response.stop_reason != "tool_use" or not calls:
+            calls = [item for item in response.output if item.type == "function_call"]
+            if not calls:
                 self.budget.spend(tokens)
-                text = "".join(block.text for block in response.content if block.type == "text")
                 return ChatReply(
-                    reply=text.strip() or UNAVAILABLE_REPLY,
+                    reply=response.output_text.strip() or UNAVAILABLE_REPLY,
                     tools_used=tools_used,
                     tokens_used=tokens,
                 )
-            # Se devuelve el contenido completo (incluidos los bloques de razonamiento) sin tocarlo.
-            conversation.append(
-                BetaAssistantMessageParam(role="assistant", content=cast(Any, response.content))
+            # Se devuelve la salida completa (con el razonamiento cifrado) sin tocarla.
+            conversation.extend(
+                cast(
+                    ResponseInputItemParam,
+                    item.model_dump(mode="json", by_alias=True, exclude_none=True),
+                )
+                for item in response.output
             )
-            results: list[BetaToolResultBlockParam] = []
             for call in calls:
                 tools_used.append(call.name)
-                content, is_error = self._run_tool(call.name, call.input)
-                results.append(
-                    BetaToolResultBlockParam(
-                        type="tool_result", tool_use_id=call.id, content=content, is_error=is_error
-                    )
+                conversation.append(
+                    {
+                        "type": "function_call_output",
+                        "call_id": call.call_id,
+                        "output": self._run_tool(call.name, call.arguments),
+                    }
                 )
-            conversation.append(BetaUserMessageParam(role="user", content=results))
         self.budget.spend(tokens)
         logger.warning("El asistente agotó las %s rondas de herramientas", MAX_TOOL_ROUNDS)
         return ChatReply(
@@ -218,41 +217,43 @@ class AssistantService:
             tokens_used=tokens,
         )
 
-    async def _create(self, conversation: list[BetaMessageParam]) -> BetaMessage:
+    async def _create(self, conversation: list[ResponseInputItemParam]) -> Response:
         try:
-            return await self.messages.create(
+            return await self.responses.create(
                 model=self.model,
-                max_tokens=MAX_OUTPUT_TOKENS,
-                system=SYSTEM_PROMPT,
+                instructions=SYSTEM_PROMPT,
+                input=conversation,
                 tools=TOOLS,
-                messages=conversation,
-                cache_control={"type": "ephemeral"},
-                output_config={"effort": self.effort},
-                betas=[FALLBACK_BETA],
-                fallbacks="default",
+                max_output_tokens=MAX_OUTPUT_TOKENS,
+                reasoning={"effort": self.effort},
+                # Sin guardar nada en OpenAI; el razonamiento viaja cifrado entre rondas.
+                store=False,
+                include=["reasoning.encrypted_content"],
             )
-        except anthropic.RateLimitError as error:
+        except openai.RateLimitError as error:
             raise AssistantUnavailableError("El asistente está saturado") from error
-        except (anthropic.APIStatusError, anthropic.APIConnectionError) as error:
-            logger.exception("Error llamando a Claude")
+        except (openai.APIStatusError, openai.APIConnectionError) as error:
+            logger.exception("Error llamando a OpenAI")
             raise AssistantUnavailableError("El asistente no está disponible") from error
 
-    def _run_tool(self, name: str, arguments: object) -> tuple[str, bool]:
+    def _run_tool(self, name: str, raw_arguments: str) -> str:
+        """Resultado de la herramienta; los errores empiezan por ``ERROR:`` para que el modelo
+        los explique en lugar de inventar."""
         try:
+            arguments = json.loads(raw_arguments or "{}")
             if name == "find_stations":
                 query = _fold(_FindStations.model_validate(arguments).query)
                 found = [s.model_dump() for s in self.forecast.stations() if query in _fold(s.name)]
-                return json.dumps(found[:40], ensure_ascii=False), False
+                return json.dumps(found[:40], ensure_ascii=False)
             if name == "get_day_forecast":
-                request = _DayForecast.model_validate(arguments)
-                return self._forecast_summary(request), False
+                return self._forecast_summary(_DayForecast.model_validate(arguments))
             if name == "get_model_info":
-                return self.forecast.model_info().model_dump_json(), False
-            return f"Herramienta desconocida: {name}", True
-        except ValidationError as error:
-            return f"Argumentos no válidos: {error.errors(include_url=False)}", True
+                return self.forecast.model_info().model_dump_json()
+            return f"ERROR: herramienta desconocida {name}"
+        except (json.JSONDecodeError, ValidationError) as error:
+            return f"ERROR: argumentos no válidos ({error})"
         except (StationNotFoundError, DateOutOfRangeError) as error:
-            return str(error), True
+            return f"ERROR: {error}"
 
     def _forecast_summary(self, request: _DayForecast) -> str:
         """Resumen compacto de la previsión: lo justo para responder, con pocos tokens."""

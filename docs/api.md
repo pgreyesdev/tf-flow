@@ -9,7 +9,7 @@ La API sirve las previsiones del modelo final. Todas las rutas cuelgan de `/api/
 | `GET /stations` | Estaciones y sentidos con previsión |
 | `GET /stations/{id}/forecast?direction=1&date=AAAA-MM-DD` | Previsión hora a hora de un día |
 | `GET /model` | Último dato con el que se entrenó, umbral de aviso y métricas en test |
-| `POST /assistant/chat` | Respuesta del asistente conversacional ([ADR 0008](adr/0008-asistente-claude.md)) |
+| `POST /assistant/chat` | Respuesta del asistente conversacional ([ADR 0009](adr/0009-asistente-openai.md)) |
 
 ## Previsión de un día
 
@@ -67,7 +67,7 @@ POST /api/v1/assistant/chat
 ```
 
 El historial lo guarda el cliente y se envía completo en cada pregunta, alternando `user` y
-`assistant` y terminando en `user`. Se activa con `TFFLOW_ANTHROPIC_API_KEY`; sin clave responde
+`assistant` y terminando en `user`. Se activa con `TFFLOW_OPENAI_API_KEY`; sin clave responde
 503. Si se define `TFFLOW_ASSISTANT_ACCESS_TOKEN`, hay que enviar ese valor en la cabecera
 `X-Assistant-Token`. Responde 429 al superar `TFFLOW_ASSISTANT_RATE_LIMIT_PER_MINUTE` preguntas por
 minuto y 503 cuando se agota `TFFLOW_ASSISTANT_DAILY_TOKEN_BUDGET`.

@@ -29,9 +29,9 @@ class Settings(BaseSettings):
     rate_limit_per_minute: int = Field(default=60, ge=1)
     """Peticiones por minuto y cliente; ``/health`` no cuenta."""
 
-    anthropic_api_key: SecretStr | None = None
+    openai_api_key: SecretStr | None = None
     """Sin clave, el asistente está desactivado y su ruta responde 503."""
-    assistant_model: str = "claude-opus-5-5"
+    assistant_model: str = "gpt-5.4-mini"
     assistant_effort: Literal["low", "medium", "high"] = "low"
     assistant_access_token: SecretStr | None = None
     """Si se define, el asistente exige la cabecera ``X-Assistant-Token`` con este valor."""

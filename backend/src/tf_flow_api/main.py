@@ -4,9 +4,9 @@ import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
-from anthropic import AsyncAnthropic
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from openai import AsyncOpenAI
 
 from tf_flow_api import __version__
 from tf_flow_api.api.router import api_router
@@ -37,12 +37,12 @@ def load_forecast_service(settings: Settings) -> ForecastService | None:
 def build_assistant(
     settings: Settings, forecast: ForecastService | None
 ) -> AssistantService | None:
-    """El asistente necesita la clave de Anthropic y el modelo de previsión."""
-    if settings.anthropic_api_key is None or forecast is None:
+    """El asistente necesita la clave de OpenAI y el modelo de previsión."""
+    if settings.openai_api_key is None or forecast is None:
         return None
-    client = AsyncAnthropic(api_key=settings.anthropic_api_key.get_secret_value(), timeout=60)
+    client = AsyncOpenAI(api_key=settings.openai_api_key.get_secret_value(), timeout=60)
     return AssistantService(
-        client.beta.messages,
+        client.responses,
         forecast,
         model=settings.assistant_model,
         effort=settings.assistant_effort,
