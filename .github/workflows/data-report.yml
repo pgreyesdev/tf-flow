@@ -23,6 +23,13 @@ jobs:
         with:
           enable-cache: true
       - run: uv sync --frozen --python 3.12
+      - id: day
+        run: echo "stamp=$(date -u +%Y%m%d)" >> "$GITHUB_OUTPUT"
+      - name: Reutilizar la instantánea de hoy
+        uses: actions/cache@v4
+        with:
+          path: data/raw/traffic
+          key: traffic-${{ inputs.years }}-${{ steps.day.outputs.stamp }}
       - name: Descargar instantánea
         env:
           YEARS: ${{ inputs.years }}

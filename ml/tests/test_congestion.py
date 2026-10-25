@@ -12,13 +12,14 @@ from tf_flow_ml.processing.congestion import (
 )
 
 
-def _hour(station: int, vehicles: int, slow: int, hour: int = 8) -> dict[str, object]:
+def _hour(
+    station: int, vehicles: int, slow: int, when: str = "2025-01-01 08:00"
+) -> dict[str, object]:
     bins = [slow, 0, vehicles - slow, 0, 0, 0]
     return {
+        "timestamp": pd.Timestamp(when),
         "station_id": station,
         "direction": 1,
-        "is_weekend": False,
-        "hour": hour,
         "vehicles": vehicles,
         **dict(zip(BIN_COLUMNS, bins, strict=True)),
     }
@@ -26,8 +27,8 @@ def _hour(station: int, vehicles: int, slow: int, hour: int = 8) -> dict[str, ob
 
 @pytest.fixture
 def history() -> pd.DataFrame:
-    """Estación 1 con señal de velocidad (10 % lentos); estación 2 urbana, siempre lenta."""
-    rows = [_hour(1, 1000, 100) for _ in range(99)] + [_hour(1, 1000, 100, hour=3)]
+    """Estación 1 con 10 % de lentos en fluido; estación 2 urbana, siempre lenta."""
+    rows = [_hour(1, v, v // 10) for v in range(100, 1100, 10)]
     rows += [_hour(2, v, v) for v in range(100, 1100, 10)]
     return pd.DataFrame(rows)
 
@@ -47,7 +48,7 @@ def test_stations_always_slow_have_no_speed_signal(history: pd.DataFrame) -> Non
 
 @pytest.mark.parametrize(
     ("slow", "expected"),
-    [(100, Level.LOW), (150, Level.LOW), (200, Level.MEDIUM), (360, Level.HIGH)],
+    [(100, Level.LOW), (200, Level.LOW), (260, Level.MEDIUM), (410, Level.HIGH)],
 )
 def test_speed_levels_follow_the_excess_over_the_usual(
     history: pd.DataFrame, slow: int, expected: Level
@@ -56,7 +57,7 @@ def test_speed_levels_follow_the_excess_over_the_usual(
 
     assert labeled["method"].item() == Method.SPEED
     assert labeled["level"].item() == expected
-    assert labeled["slow_excess"].item() == pytest.approx(slow / 1000 - 0.1)
+    assert labeled["slow_excess"].item() == pytest.approx(slow / 1000 - 0.1, abs=0.001)
 
 
 def test_quiet_hours_are_never_congested(history: pd.DataFrame) -> None:
@@ -89,6 +90,18 @@ def test_thresholds_are_configurable(history: pd.DataFrame) -> None:
     strict = CongestionLabeler(Thresholds(speed_medium=0.03)).fit(history)
 
     assert strict.transform(pd.DataFrame([_hour(1, 1000, 150)]))["level"].item() == Level.MEDIUM
+
+
+def test_references_use_only_the_most_recent_window() -> None:
+    old = [_hour(1, v, v, when="2023-01-01 08:00") for v in range(100, 1100, 10)]
+    recent = [_hour(1, v, v // 10, when="2025-01-01 08:00") for v in range(100, 1100, 10)]
+    history = pd.DataFrame(old + recent)
+
+    windowed = CongestionLabeler().fit(history)
+    everything = CongestionLabeler(Thresholds(window_days=None)).fit(history)
+
+    assert windowed.stations.loc[(1, 1), "baseline_slow"] == pytest.approx(0.1, abs=0.001)
+    assert everything.stations.loc[(1, 1), "baseline_slow"] > 0.1
 
 
 def test_must_fit_first() -> None:

@@ -1,6 +1,6 @@
 """Comprueba el índice de congestión del ADR 0006 sobre datos que el etiquetador no ha visto.
 
-Ajusta las referencias con 2019 y 2021-2024 (2020 se excluye por el confinamiento) y etiqueta
+Ajusta las referencias con los datos hasta 2024 (el etiquetador usa su último año) y etiqueta
 2025-2026. Imprime en Markdown la frecuencia de cada nivel y los episodios más fuertes, para
 contrastarlos con atascos conocidos.
 
@@ -27,7 +27,7 @@ def main(snapshot_dir: Path) -> None:
     hourly = aggregate_hourly(raw, mainline_only=True)
     del raw
     year = hourly["timestamp"].dt.year
-    train = hourly[(year <= 2024) & (year != 2020)]
+    train = hourly[year <= 2024]
     test = hourly[year >= 2025]
 
     labeler = CongestionLabeler().fit(train)
@@ -73,9 +73,29 @@ def main(snapshot_dir: Path) -> None:
         .size()
         .rename("horas_alto")
         .sort_values(ascending=False)
+        .reset_index()
+        .groupby(["station_id", "direction"])
+        .head(2)
         .head(30)
     )
-    section("Días con más horas de riesgo alto", daily.to_markdown())
+    section(
+        "Días con más horas de riesgo alto (máximo dos por estación)",
+        daily.to_markdown(index=False),
+    )
+
+    stations_peak = workday[workday["hour"].between(7, 9)]
+    peak = (
+        pd.crosstab(
+            [stations_peak["station_id"], stations_peak["name"], stations_peak["direction"]],
+            stations_peak["level"],
+            normalize="index",
+        )
+        .mul(100)
+        .round(1)
+        .sort_values(Level.HIGH, ascending=False)
+        .head(15)
+    )
+    section("Laborables de 7 a 9 h: estaciones con más riesgo alto (%)", peak.to_markdown())
 
 
 if __name__ == "__main__":
