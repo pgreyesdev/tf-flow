@@ -55,7 +55,8 @@ jobs:
           snapshot=$(ls -d data/raw/traffic/*/ | tail -n 1)
           uv run python -m tf_flow_ml.training "$snapshot" --out artifacts \
             --test-from "$TEST_FROM" --n-estimators "$N_ESTIMATORS" \
-            --mlflow-uri sqlite:///mlflow/mlflow.db --mlflow-artifacts mlflow/artifacts
+            --mlflow-uri sqlite:///mlflow/mlflow.db --mlflow-artifacts mlflow/artifacts \
+            --serving-bundle artifacts/serving.joblib
           cat artifacts/entrenamiento.md >> "$GITHUB_STEP_SUMMARY"
           cat artifacts/entrenamiento.md
       - uses: actions/upload-artifact@v7

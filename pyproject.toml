@@ -18,7 +18,7 @@ tf-flow-ml = { workspace = true }
 [dependency-groups]
 dev = [
     "tf-flow-api",
-    "tf-flow-ml",
+    "tf-flow-ml[tracking]",
     "mypy>=1.13",
     "pandas-stubs>=2.2",
     "pre-commit>=4.0",

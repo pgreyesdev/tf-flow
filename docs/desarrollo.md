@@ -64,7 +64,7 @@ Con `--mlflow-uri` la ejecución queda registrada en MLflow con su configuració
 
 ```bash
 uv run python -m tf_flow_ml.training data/raw/traffic/AAAAMMDD --mlflow-uri sqlite:///mlflow.db
-uv run mlflow ui --backend-store-uri sqlite:///mlflow.db
+uvx mlflow ui --backend-store-uri sqlite:///mlflow.db   # interfaz web, sin instalarla en el proyecto
 ```
 
 En GitHub, el flujo **Entrenamiento** hace lo mismo con la última instantánea descargada y conserva

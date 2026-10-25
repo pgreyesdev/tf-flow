@@ -9,7 +9,6 @@ import pytest
 from tf_flow_ml.evaluation.explain import shap_values
 from tf_flow_ml.evaluation.metrics import ClassificationReport
 from tf_flow_ml.models.baseline import NotFittedError
-from tf_flow_ml.processing.aggregation import BIN_COLUMNS, add_calendar_features
 from tf_flow_ml.training import __main__ as cli
 from tf_flow_ml.training.features import FEATURES, FeatureBuilder, recent_profile
 from tf_flow_ml.training.pipeline import (
@@ -24,27 +23,6 @@ from tf_flow_ml.training.report import render_report
 from tf_flow_ml.training.tracking import EXPERIMENT
 
 FAST = TrainingConfig(test_from="2025-01-01", n_estimators=10)
-
-
-@pytest.fixture(scope="module")
-def hourly() -> pd.DataFrame:
-    """Dos estaciones con ciclo diario; la 2 se atasca en hora punta."""
-    rng = np.random.default_rng(0)
-    stamps = pd.date_range("2023-07-01", "2025-03-31 23:00", freq="h")
-    frames = []
-    for station in (1, 2):
-        expected = np.asarray(300 * station * (1 + np.sin((stamps.hour - 6) / 24 * 2 * np.pi)) + 20)
-        vehicles = rng.poisson(expected)
-        jam = (station == 2) & np.isin(stamps.hour, [7, 8, 14])
-        slow = np.where(jam, vehicles * 0.7, vehicles * 0.1).astype(int)
-        frame = pd.DataFrame(
-            {"timestamp": stamps, "station_id": station, "direction": 1, "vehicles": vehicles}
-        )
-        frame[BIN_COLUMNS] = 0
-        frame["speed_bin_1"] = slow
-        frame["speed_bin_3"] = vehicles - slow
-        frames.append(frame)
-    return add_calendar_features(pd.concat(frames, ignore_index=True))
 
 
 @pytest.fixture(scope="module")
@@ -113,6 +91,7 @@ def test_cli_writes_report_and_models(
         [
             *(str(tmp_path), "--out", str(tmp_path / "out"), "--n-estimators", "5"),
             *("--mlflow-uri", f"sqlite:///{db}"),
+            *("--serving-bundle", str(tmp_path / "out" / "serving.joblib")),
         ]
     )
 
@@ -124,6 +103,7 @@ def test_cli_writes_report_and_models(
     assert len(runs) == 1
     assert "metrics.volume.lightgbm.wape" in runs.columns
     assert list((tmp_path / "out" / "mlruns").rglob("entrenamiento.md"))
+    assert (tmp_path / "out" / "serving.joblib.sha256").exists()
 
 
 def test_recent_profile_only_sees_published_data() -> None:

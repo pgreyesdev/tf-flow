@@ -58,6 +58,8 @@ class TrainingResult:
     models: dict[str, Any]
     x_test: pd.DataFrame
     high_threshold: float
+    data: pd.DataFrame
+    """Todo el histórico con festivos y niveles, para reentrenar el modelo final."""
 
 
 def label_by_year(hourly: pd.DataFrame, thresholds: Thresholds | None = None) -> pd.Series:
@@ -110,6 +112,20 @@ def _timed(fit_predict: Callable[[], np.ndarray]) -> tuple[np.ndarray, float]:
     return predictions, time.perf_counter() - start
 
 
+def lightgbm_options(config: TrainingConfig) -> dict[str, Any]:
+    return {
+        "n_estimators": config.n_estimators,
+        "learning_rate": 0.05,
+        "num_leaves": 127,
+        "min_child_samples": 50,
+        "subsample": 0.8,
+        "subsample_freq": 1,
+        "colsample_bytree": 0.8,
+        "random_state": config.seed,
+        "verbose": -1,
+    }
+
+
 def train_and_evaluate(hourly: pd.DataFrame, config: TrainingConfig) -> TrainingResult:
     data = add_holiday_features(hourly)
     data["level"] = label_by_year(data, config.thresholds)
@@ -127,17 +143,7 @@ def train_and_evaluate(hourly: pd.DataFrame, config: TrainingConfig) -> Training
         "n_jobs": -1,
         "random_state": config.seed,
     }
-    lgbm_options: dict[str, Any] = {
-        "n_estimators": config.n_estimators,
-        "learning_rate": 0.05,
-        "num_leaves": 127,
-        "min_child_samples": 50,
-        "subsample": 0.8,
-        "subsample_freq": 1,
-        "colsample_bytree": 0.8,
-        "random_state": config.seed,
-        "verbose": -1,
-    }
+    lgbm_options = lightgbm_options(config)
     models: dict[str, Any] = {}
 
     def fit_lgbm(name: str, model: Any, x: pd.DataFrame, y: pd.Series) -> Callable[[], Any]:
@@ -207,4 +213,5 @@ def train_and_evaluate(hourly: pd.DataFrame, config: TrainingConfig) -> Training
         models=models,
         x_test=x_test,
         high_threshold=high_threshold,
+        data=data,
     )
