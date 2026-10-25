@@ -1,10 +1,12 @@
 from pathlib import Path
 
 import joblib
+import mlflow
 import numpy as np
 import pandas as pd
 import pytest
 
+from tf_flow_ml.evaluation.explain import shap_values
 from tf_flow_ml.evaluation.metrics import ClassificationReport
 from tf_flow_ml.models.baseline import NotFittedError
 from tf_flow_ml.processing.aggregation import BIN_COLUMNS, add_calendar_features
@@ -14,9 +16,12 @@ from tf_flow_ml.training.pipeline import (
     TrainingConfig,
     TrainingResult,
     label_by_year,
+    predict_with_threshold,
     train_and_evaluate,
+    tune_high_threshold,
 )
 from tf_flow_ml.training.report import render_report
+from tf_flow_ml.training.tracking import EXPERIMENT
 
 FAST = TrainingConfig(test_from="2025-01-01", n_estimators=10)
 
@@ -25,7 +30,7 @@ FAST = TrainingConfig(test_from="2025-01-01", n_estimators=10)
 def hourly() -> pd.DataFrame:
     """Dos estaciones con ciclo diario; la 2 se atasca en hora punta."""
     rng = np.random.default_rng(0)
-    stamps = pd.date_range("2024-01-01", "2025-03-31 23:00", freq="h")
+    stamps = pd.date_range("2023-07-01", "2025-03-31 23:00", freq="h")
     frames = []
     for station in (1, 2):
         expected = np.asarray(300 * station * (1 + np.sin((stamps.hour - 6) / 24 * 2 * np.pi)) + 20)
@@ -78,7 +83,7 @@ def test_compares_every_model_on_the_future(result: TrainingResult) -> None:
         "baseline",
         "random_forest",
         "lightgbm",
-        "lightgbm_balanced",
+        "lightgbm_threshold",
     ]
     assert result.test["timestamp"].min() >= pd.Timestamp(FAST.test_from)
     random_forest = result.level[1].report
@@ -90,8 +95,9 @@ def test_report_lists_models_and_importances(result: TrainingResult) -> None:
     report = render_report(result, pd.Series({1: "NORTE", 2: "SUR"}))
 
     assert "## Volumen horario (regresión)" in report
-    assert "lightgbm_balanced" in report
-    assert "profile_mean" in report
+    assert "lightgbm_threshold" in report
+    assert "SHAP" in report
+    assert "recent_vehicles" in report
     assert "SUR" in report
 
 
@@ -102,11 +108,22 @@ def test_cli_writes_report_and_models(
     monkeypatch.setattr(cli, "load_snapshot", lambda _: raw)
     monkeypatch.setattr(cli, "aggregate_hourly", lambda *_, **__: hourly)
 
-    cli.main([str(tmp_path), "--out", str(tmp_path / "out"), "--n-estimators", "5"])
+    db = tmp_path / "mlflow.db"
+    cli.main(
+        [
+            *(str(tmp_path), "--out", str(tmp_path / "out"), "--n-estimators", "5"),
+            *("--mlflow-uri", f"sqlite:///{db}"),
+        ]
+    )
 
     assert "NORTE" in (tmp_path / "out" / "entrenamiento.md").read_text(encoding="utf-8")
     bundle = joblib.load(tmp_path / "out" / "modelos.joblib")
-    assert set(bundle["models"]) == {"volume_lightgbm", "level_lightgbm", "level_lightgbm_balanced"}
+    assert set(bundle["models"]) == {"volume_lightgbm", "level_lightgbm"}
+    assert 0 < bundle["high_threshold"] < 1
+    runs = mlflow.search_runs(experiment_names=[EXPERIMENT])
+    assert len(runs) == 1
+    assert "metrics.volume.lightgbm.wape" in runs.columns
+    assert list((tmp_path / "out" / "mlruns").rglob("entrenamiento.md"))
 
 
 def test_recent_profile_only_sees_published_data() -> None:
@@ -133,3 +150,38 @@ def test_recent_profile_only_sees_published_data() -> None:
     assert recent["recent_high"].iloc[0] == 0
     assert recent["recent_high"].iloc[1] == pytest.approx(15 / 28)
     assert recent.iloc[2].isna().all()
+
+
+def test_threshold_trades_precision_for_recall() -> None:
+    class Stub:
+        classes_ = np.array(["high", "low", "medium"], dtype=object)
+
+        def predict_proba(self, _: pd.DataFrame) -> np.ndarray:
+            return np.array([[0.4, 0.5, 0.1], [0.2, 0.7, 0.1], [0.1, 0.3, 0.6]])
+
+    features = pd.DataFrame(index=range(3))
+    truth = pd.Series(["high", "low", "medium"])
+
+    assert predict_with_threshold(Stub(), features, 0.5).tolist() == ["low", "low", "medium"]
+    assert predict_with_threshold(Stub(), features, 0.3).tolist() == ["high", "low", "medium"]
+    threshold = tune_high_threshold(Stub(), features, truth)
+    assert 0.2 < threshold <= 0.4
+
+
+def test_shap_values_add_up_to_the_prediction(result: TrainingResult) -> None:
+    model = result.models["volume_lightgbm"]
+    rows = result.x_test.head(50)
+
+    contributions = shap_values(model, rows)
+    bias = model.predict(rows, pred_contrib=True)[:, -1]
+
+    assert np.allclose(contributions.sum(axis=1) + bias, model.predict(rows))
+    high = shap_values(result.models["level_lightgbm"], rows, "high")
+    assert list(high.columns) == FEATURES
+
+
+def test_threshold_needs_more_than_a_year_of_training(hourly: pd.DataFrame) -> None:
+    recent = hourly[hourly["timestamp"] >= pd.Timestamp("2024-06-01")]
+
+    with pytest.raises(ValueError, match="umbral"):
+        train_and_evaluate(recent, FAST)

@@ -56,6 +56,8 @@ class TrainingResult:
     test: pd.DataFrame
     features: FeatureBuilder
     models: dict[str, Any]
+    x_test: pd.DataFrame
+    high_threshold: float
 
 
 def label_by_year(hourly: pd.DataFrame, thresholds: Thresholds | None = None) -> pd.Series:
@@ -66,6 +68,39 @@ def label_by_year(hourly: pd.DataFrame, thresholds: Thresholds | None = None) ->
         labeler = CongestionLabeler(thresholds).fit(year)
         levels.append(labeler.transform(year)["level"])
     labels: pd.Series = pd.concat(levels).reindex(hourly.index)
+    return labels
+
+
+def tune_high_threshold(
+    model: Any, features: pd.DataFrame, truth: pd.Series, grid: np.ndarray | None = None
+) -> float:
+    """Probabilidad de atasco fuerte a partir de la cual conviene avisar: la que maximiza el F1 de
+    la clase ``high``, que equilibra falsas alarmas y atascos no detectados."""
+    grid = np.arange(0.15, 0.85, 0.05) if grid is None else grid
+    probabilities = predict_high_probability(model, features)
+    is_high = truth.to_numpy() == Level.HIGH
+    scores = []
+    for threshold in grid:
+        flagged = probabilities >= threshold
+        hits = (flagged & is_high).sum()
+        scores.append(2 * hits / max(flagged.sum() + is_high.sum(), 1))
+    return float(grid[int(np.argmax(scores))])
+
+
+def predict_high_probability(model: Any, features: pd.DataFrame) -> np.ndarray:
+    position = list(model.classes_).index(Level.HIGH)
+    return np.asarray(model.predict_proba(features))[:, position]
+
+
+def predict_with_threshold(model: Any, features: pd.DataFrame, threshold: float) -> np.ndarray:
+    """``high`` si su probabilidad supera el umbral; si no, la clase más probable entre el resto."""
+    probabilities = np.asarray(model.predict_proba(features))
+    classes = np.asarray(model.classes_, dtype=object)
+    high = list(classes).index(Level.HIGH)
+    rest = probabilities.copy()
+    rest[:, high] = -1
+    labels = classes[rest.argmax(axis=1)]
+    labels[probabilities[:, high] >= threshold] = Level.HIGH
     return labels
 
 
@@ -139,12 +174,6 @@ def train_and_evaluate(hourly: pd.DataFrame, config: TrainingConfig) -> Training
             .predict(x_test)
         ),
         "lightgbm": fit_lgbm("level_lightgbm", LGBMClassifier(**lgbm_options), x_level, y_level),
-        "lightgbm_balanced": fit_lgbm(
-            "level_lightgbm_balanced",
-            LGBMClassifier(**lgbm_options, class_weight="balanced"),
-            x_level,
-            y_level,
-        ),
     }
     level = []
     truth = test["level"].astype(str).to_numpy()[labeled_test]
@@ -152,6 +181,21 @@ def train_and_evaluate(hourly: pd.DataFrame, config: TrainingConfig) -> Training
         predictions, seconds = _timed(run)
         scores = classification_report(truth, np.asarray(predictions)[labeled_test])
         level.append(ModelResult(name, seconds, scores, np.asarray(predictions)))
+
+    # El umbral se elige con el último año de entrenamiento, nunca con el test.
+    start = time.perf_counter()
+    validation_from = pd.Timestamp(config.test_from) - pd.DateOffset(years=1)
+    is_fit = (train.loc[labeled_train, "timestamp"] < validation_from).to_numpy()
+    if is_fit.all() or not is_fit.any():
+        raise ValueError("Hace falta más de un año de entrenamiento para elegir el umbral")
+    tuner = LGBMClassifier(**lgbm_options).fit(
+        x_level[is_fit], y_level[is_fit], categorical_feature=CATEGORICAL
+    )
+    high_threshold = tune_high_threshold(tuner, x_level[~is_fit], y_level[~is_fit])
+    predictions = predict_with_threshold(models["level_lightgbm"], x_test, high_threshold)
+    scores = classification_report(truth, predictions[labeled_test])
+    seconds = time.perf_counter() - start
+    level.append(ModelResult("lightgbm_threshold", seconds, scores, predictions))
 
     return TrainingResult(
         train_rows=len(train),
@@ -161,4 +205,6 @@ def train_and_evaluate(hourly: pd.DataFrame, config: TrainingConfig) -> Training
         test=test,
         features=features,
         models=models,
+        x_test=x_test,
+        high_threshold=high_threshold,
     )

@@ -4,8 +4,9 @@ from dataclasses import asdict
 
 import pandas as pd
 
+from tf_flow_ml.evaluation.explain import shap_importance
 from tf_flow_ml.evaluation.metrics import regression_report
-from tf_flow_ml.training.features import FEATURES
+from tf_flow_ml.processing.congestion import Level
 from tf_flow_ml.training.pipeline import ModelResult, TrainingResult
 
 
@@ -59,14 +60,17 @@ def render_report(result: TrainingResult, names: pd.Series | None = None) -> str
         per_station.round(4).to_markdown(),
         "## Nivel de congestión (clasificación, sin horas desconocidas)",
         _table(result.level),
+        f"`lightgbm_threshold` avisa de atasco fuerte cuando su probabilidad supera "
+        f"{result.high_threshold:.2f}; el umbral se eligió con el último año de entrenamiento.",
     ]
-    if "volume_lightgbm" in result.models:
-        importance = pd.Series(
-            result.models["volume_lightgbm"].booster_.feature_importance("gain"), index=FEATURES
-        )
-        share = (importance / importance.sum()).sort_values(ascending=False).rename("ganancia")
-        sections += [
-            "## Importancia de variables (LightGBM, volumen)",
-            share.round(4).to_markdown(),
-        ]
+    volume_shap = shap_importance(result.models["volume_lightgbm"], result.x_test)
+    level_shap = shap_importance(result.models["level_lightgbm"], result.x_test, Level.HIGH)
+    importance = pd.concat(
+        [volume_shap.rename("volumen (vehículos)"), level_shap.rename("atasco fuerte (log-odds)")],
+        axis=1,
+    )
+    sections += [
+        "## Importancia de variables (media del |SHAP| de LightGBM)",
+        importance.round(4).to_markdown(),
+    ]
     return "\n\n".join(sections) + "\n"

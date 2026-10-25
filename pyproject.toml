@@ -54,7 +54,7 @@ mypy_path = ["backend/src", "ml/src"]
 packages = ["tf_flow_api", "tf_flow_ml"]
 
 [[tool.mypy.overrides]]
-module = ["sklearn.*", "pyarrow.*", "lightgbm.*", "joblib.*"]
+module = ["sklearn.*", "pyarrow.*", "lightgbm.*", "joblib.*", "mlflow.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]
@@ -63,6 +63,8 @@ addopts = "--strict-markers --import-mode=importlib"
 filterwarnings = [
     "error",
     "ignore:Using `httpx` with `starlette.testclient` is deprecated",
+    # MLflow todavía usa APIs de SQLAlchemy marcadas como obsoletas en la 2.1.
+    "ignore::sqlalchemy.exc.SADeprecationWarning",
 ]
 
 [tool.coverage.run]

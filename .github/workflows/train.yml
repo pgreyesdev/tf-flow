@@ -40,18 +40,28 @@ jobs:
           if ! ls -d data/raw/traffic/*/ > /dev/null 2>&1; then
             uv run python -m tf_flow_ml.ingestion traffic --years 2019-2026 --out data/raw
           fi
+      - name: Recuperar el historial de MLflow
+        uses: actions/cache@v4
+        with:
+          path: mlflow
+          key: mlflow-${{ github.run_id }}
+          restore-keys: mlflow-
       - name: Entrenar y evaluar
         env:
           TEST_FROM: ${{ inputs.test_from }}
           N_ESTIMATORS: ${{ inputs.n_estimators }}
         run: |
+          mkdir -p mlflow
           snapshot=$(ls -d data/raw/traffic/*/ | tail -n 1)
           uv run python -m tf_flow_ml.training "$snapshot" --out artifacts \
-            --test-from "$TEST_FROM" --n-estimators "$N_ESTIMATORS"
+            --test-from "$TEST_FROM" --n-estimators "$N_ESTIMATORS" \
+            --mlflow-uri sqlite:///mlflow/mlflow.db --mlflow-artifacts mlflow/artifacts
           cat artifacts/entrenamiento.md >> "$GITHUB_STEP_SUMMARY"
           cat artifacts/entrenamiento.md
       - uses: actions/upload-artifact@v7
         with:
           name: modelos
-          path: artifacts
+          path: |
+            artifacts
+            mlflow
           retention-days: 30

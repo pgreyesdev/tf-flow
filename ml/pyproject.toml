@@ -4,14 +4,17 @@ version = "0.1.0"
 description = "Ingesta de datos, preprocesado y modelos de TF-FLOW."
 requires-python = ">=3.12,<3.13"
 dependencies = [
+    "alembic>=1.20.1",
     "holidays>=0.107",
     "httpx>=0.28",
     "joblib>=1.6.0",
     "lightgbm>=4.7.0",
+    "mlflow-skinny>=3.17.2",
     "numpy>=2.1",
     "pandas>=2.2",
     "pyarrow>=18.0",
     "scikit-learn>=1.5",
+    "sqlalchemy>=2.1.6",
     "tabulate>=0.9",
 ]
 

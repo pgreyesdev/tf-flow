@@ -56,4 +56,16 @@ los puentes y el perfil histórico de cada estación. También reciben cómo fue
 hora en las cuatro semanas que terminaron 45 días antes. El Cabildo publica los datos con retraso,
 así que el modelo nunca usa datos que no estarían publicados en el momento de predecir.
 
-En GitHub, el flujo **Entrenamiento** hace lo mismo con la última instantánea descargada.
+El informe incluye la importancia de cada variable según SHAP, que LightGBM calcula de forma
+exacta sobre sus árboles. Para el atasco fuerte, el modelo avisa cuando la probabilidad supera un
+umbral que se elige con el último año de entrenamiento.
+
+Con `--mlflow-uri` la ejecución queda registrada en MLflow con su configuración y sus métricas:
+
+```bash
+uv run python -m tf_flow_ml.training data/raw/traffic/AAAAMMDD --mlflow-uri sqlite:///mlflow.db
+uv run mlflow ui --backend-store-uri sqlite:///mlflow.db
+```
+
+En GitHub, el flujo **Entrenamiento** hace lo mismo con la última instantánea descargada y conserva
+el historial de MLflow entre ejecuciones.

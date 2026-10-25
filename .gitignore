@@ -37,3 +37,5 @@ android/local.properties
 
 # Documentación generada
 site/
+mlflow/
+mlflow.db
