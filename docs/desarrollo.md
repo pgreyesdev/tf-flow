@@ -74,3 +74,39 @@ uvx mlflow ui --backend-store-uri sqlite:///mlflow.db   # interfaz web, sin inst
 
 En GitHub, el flujo **Entrenamiento** hace lo mismo con la última instantánea descargada y conserva
 el historial de MLflow entre ejecuciones.
+
+## Despliegue
+
+La web va en Vercel y la API en Fly.io. La web llama a la API desde su servidor, así que el
+navegador nunca ve la dirección de la API ni el token del asistente.
+
+### API en Fly.io
+
+`fly.toml` describe la máquina (1 GB, Madrid, se para sin tráfico) y monta el volumen `models` en
+`/models`. La primera vez:
+
+```bash
+fly volumes create models --region mad --size 1
+fly deploy                                   # arranca sin modelo: /health dice model_loaded=false
+fly ssh sftp shell                           # dentro: put models/serving.joblib /models/serving.joblib
+fly secrets set \
+  TFFLOW_MODEL_PATH=/models/serving.joblib \
+  TFFLOW_MODEL_SHA256=$(cut -d' ' -f1 models/serving.joblib.sha256) \
+  TFFLOW_ASSISTANT_ACCESS_TOKEN=$(openssl rand -hex 32) \
+  TFFLOW_OPENAI_API_KEY=sk-...
+```
+
+`fly secrets set` reinicia la API con el modelo. Para publicar un modelo nuevo se repiten el `put` y
+el secreto `TFFLOW_MODEL_SHA256`.
+
+### Web en Vercel
+
+Directorio raíz `web` y estas variables de entorno de producción:
+
+| Variable | Valor |
+| --- | --- |
+| `TFFLOW_API_URL` | `https://<app>.fly.dev` |
+| `TFFLOW_ASSISTANT_TOKEN` | El mismo `TFFLOW_ASSISTANT_ACCESS_TOKEN` de Fly |
+| `TFFLOW_SITE_URL` | La URL pública de la web |
+
+Vercel fija `X-Real-IP`, que la web usa para limitar las preguntas al asistente por visitante.

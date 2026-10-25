@@ -1,0 +1,19 @@
+# La imagen de la API solo necesita pyproject.toml, uv.lock, backend/ y ml/.
+.git
+.venv
+**/__pycache__
+**/.mypy_cache
+**/.pytest_cache
+**/.ruff_cache
+data
+artifacts
+models
+mlflow
+mlruns
+site
+web
+android
+docs
+*.joblib
+.env
+.env.*

@@ -1,0 +1,37 @@
+# Despliegue de la API en Fly.io. Cambia `app` por el nombre que elegiste en `fly launch`.
+# El modelo vive en un volumen: ver la sección «Despliegue» de docs/desarrollo.md.
+app = "tf-flow-api"
+primary_region = "mad"
+
+[build]
+  dockerfile = "backend/Dockerfile"
+
+[env]
+  TFFLOW_ENVIRONMENT = "production"
+  # La web llama desde unos pocos servidores y guarda las previsiones 10 minutos; el límite por
+  # visitante lo pone ella.
+  TFFLOW_RATE_LIMIT_PER_MINUTE = "600"
+  TFFLOW_ASSISTANT_RATE_LIMIT_PER_MINUTE = "60"
+
+[[mounts]]
+  source = "models"
+  destination = "/models"
+
+[http_service]
+  internal_port = 8000
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0
+
+  [[http_service.checks]]
+    grace_period = "20s"
+    interval = "30s"
+    timeout = "5s"
+    method = "GET"
+    path = "/api/v1/health"
+
+[[vm]]
+  memory = "1gb"
+  cpu_kind = "shared"
+  cpus = 1
