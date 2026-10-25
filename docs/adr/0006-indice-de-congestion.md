@@ -1,6 +1,6 @@
 # ADR 0006 · Índice de congestión basado en la velocidad
 
-- **Estado:** propuesta, en validación con 2025-2026
+- **Estado:** aceptada; los umbrales se recalibrarán al entrenar los modelos
 - **Fecha:** 2026-10-25
 
 ## Contexto
@@ -47,6 +47,19 @@ horas. Por eso la referencia es el tráfico fluido y solo se usa el último año
 
 Los umbrales son la propuesta inicial y se ajustarán con la validación sobre 2025-2026 y con
 episodios conocidos. La implementación está en `tf_flow_ml.processing.congestion`.
+
+## Validación
+
+Ajustado con 2024 y aplicado a enero 2025 - septiembre 2026:
+
+- Niveles: bajo 81,8 %, medio 10,0 %, alto 5,2 %, desconocido 2,9 %.
+- En laborables, el nivel alto sube al 14 % a las 7 h y al 18 % a las 14 h, y baja de nuevo al
+  1 % por la noche.
+- Los atascos recurrentes salen donde se esperan: TF-1 en Los Cristianos por la mañana y los
+  accesos a La Laguna.
+- Las estaciones que cambiaron de comportamiento (Depuradora, Al Campo) ya no aparecen saturadas.
+- Una estación sin tráfico en la ventana de ajuste (Padre Anchieta, un sentido) quedaba como
+  "alto" siempre; ahora se marca como desconocida.
 
 ## Consecuencias
 

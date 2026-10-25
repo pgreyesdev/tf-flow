@@ -79,6 +79,8 @@ class CongestionLabeler:
         if t.window_days is not None:
             df = df[df["timestamp"] > df["timestamp"].max() - pd.Timedelta(days=t.window_days)]
         capacity = df.groupby(STATION_KEYS)["vehicles"].quantile(0.99).rename("capacity")
+        # Una estación sin tráfico observado en la ventana no tiene capacidad de referencia.
+        capacity = capacity.where(capacity > 0)
         ratio = df["vehicles"] / df.join(capacity, on=STATION_KEYS)["capacity"]
         low, high = t.free_flow_band
         fluid = df[ratio.between(low, high)]

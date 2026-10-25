@@ -86,6 +86,15 @@ def test_unknown_station_is_flagged(history: pd.DataFrame) -> None:
     assert labeled["level"].item() == Level.UNKNOWN
 
 
+def test_station_without_observed_traffic_is_unknown(history: pd.DataFrame) -> None:
+    silent = pd.DataFrame([_hour(3, 0, 0) for _ in range(50)])
+    labeler = CongestionLabeler().fit(pd.concat([history, silent]))
+
+    out = labeler.transform(pd.DataFrame([_hour(3, 500, 0)]))
+
+    assert out["level"].tolist() == [Level.UNKNOWN]
+
+
 def test_thresholds_are_configurable(history: pd.DataFrame) -> None:
     strict = CongestionLabeler(Thresholds(speed_medium=0.03)).fit(history)
 
