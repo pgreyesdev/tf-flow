@@ -34,3 +34,12 @@ def test_docs_are_hidden_in_production() -> None:
 
 def test_docs_are_available_outside_production(client: TestClient) -> None:
     assert client.get("/openapi.json").status_code == 200
+
+
+def test_json_responses_forbid_loading_content(client: TestClient) -> None:
+    response = client.get("/api/v1/health")
+
+    assert (
+        response.headers["Content-Security-Policy"] == "default-src 'none'; frame-ancestors 'none'"
+    )
+    assert "Content-Security-Policy" not in client.get("/docs").headers

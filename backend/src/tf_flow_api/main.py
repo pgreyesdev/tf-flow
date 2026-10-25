@@ -11,6 +11,7 @@ from tf_flow_api import __version__
 from tf_flow_api.api.router import api_router
 from tf_flow_api.core.config import Settings, get_settings
 from tf_flow_api.core.logging import configure_logging
+from tf_flow_api.core.rate_limit import RateLimiter, rate_limit_middleware
 from tf_flow_api.core.security import add_security_headers
 from tf_flow_api.services.forecast import ForecastService
 from tf_flow_ml.serving.bundle import load_bundle
@@ -59,6 +60,7 @@ def create_app(
         allow_methods=["GET", "POST"],
         allow_headers=["Content-Type"],
     )
+    app.middleware("http")(rate_limit_middleware(RateLimiter(settings.rate_limit_per_minute)))
     app.middleware("http")(add_security_headers)
     app.include_router(api_router)
     return app

@@ -25,6 +25,8 @@ class Settings(BaseSettings):
     model_sha256: str | None = Field(default=None, pattern=r"^[0-9a-fA-F]{64}$")
     """Huella esperada del paquete; sin ella no se carga."""
     max_forecast_days: int = Field(default=14, ge=1, le=60)
+    rate_limit_per_minute: int = Field(default=60, ge=1)
+    """Peticiones por minuto y cliente; ``/health`` no cuenta."""
 
     @property
     def docs_enabled(self) -> bool:

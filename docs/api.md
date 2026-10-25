@@ -55,3 +55,14 @@ export TFFLOW_MODEL_PATH=models/serving.joblib
 export TFFLOW_MODEL_SHA256=$(cut -d' ' -f1 models/serving.joblib.sha256)
 make api
 ```
+
+## Protección
+
+- Cada cliente puede hacer `TFFLOW_RATE_LIMIT_PER_MINUTE` peticiones por minuto (60 por defecto);
+  al pasarse recibe 429 con `Retry-After`. `/health` no cuenta. Detrás de un proxy, uvicorn debe
+  arrancar con `--proxy-headers --forwarded-allow-ips=<IP del proxy>` para limitar por la IP real.
+- Todas las respuestas llevan cabeceras de seguridad (HSTS, `nosniff`, `X-Frame-Options`) y una
+  política de contenido que impide al navegador cargar nada desde la API.
+- CORS solo acepta los orígenes de `TFFLOW_CORS_ORIGINS` y los métodos `GET` y `POST`.
+- Los parámetros se validan antes de llegar al modelo: estación entre 1 y 99 999, sentido -1, 0 o 1
+  y fecha dentro del rango permitido.
