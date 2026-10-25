@@ -48,10 +48,9 @@ describe("AppPromo", () => {
       "https://play.google.com/store/apps/details?id=x",
     );
     const phone = container.querySelector("[aria-hidden='true'].select-none")!;
-    expect(phone).toHaveTextContent("Los Cristianos · sentido creciente");
-    expect(phone).toHaveTextContent("06:00");
-    expect(phone).toHaveTextContent("10:00");
-    expect(phone).toHaveTextContent("Sal antes de las 06:00");
+    expect(phone).toHaveTextContent("Los Cristianos");
+    expect(phone).toHaveTextContent("88 %Atasco a las 08:00");
+    expect(phone).toHaveTextContent("Sal antes de las 08:00 para evitar el tráfico.");
   });
 });
 

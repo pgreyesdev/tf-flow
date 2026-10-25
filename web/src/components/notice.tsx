@@ -17,7 +17,7 @@ export function Notice({
       role={tone === "error" ? "alert" : "status"}
       className={cx(
         "flex gap-3 rounded-2xl border p-4 sm:p-5",
-        tone === "error" ? "border-high/40 bg-high-soft" : "border-accent/30 bg-accent-soft",
+        tone === "error" ? "border-high/40 bg-high/15" : "border-accent/30 bg-glass",
       )}
     >
       <Icon
@@ -26,7 +26,7 @@ export function Notice({
       />
       <div>
         <p className="font-semibold">{title}</p>
-        <div className="mt-0.5 text-muted">{children}</div>
+        <div className="mt-0.5 text-ink-soft">{children}</div>
       </div>
     </div>
   );

@@ -13,16 +13,12 @@ interface ForecastFormProps {
   maxDate: string;
 }
 
-const field =
-  "mt-1.5 block min-h-12 w-full rounded-xl border border-border-strong bg-surface px-3.5 text-base text-foreground";
+const field = "mt-1.5 block min-h-12 w-full glass px-3.5 text-base text-ink";
 
 /** Formulario de búsqueda. Envía por GET, así que funciona también sin JavaScript. */
 export function ForecastForm({ stations, selected, date, minDate, maxDate }: ForecastFormProps) {
   return (
-    <Form
-      action="/prediccion"
-      className="grid gap-4 rounded-2xl border border-border bg-surface p-5 sm:grid-cols-[1fr_12rem_auto] sm:items-end sm:p-6"
-    >
+    <Form action="/prediccion" className="grid gap-4">
       <div>
         <label htmlFor="estacion" className="font-semibold">
           Punto de medida
@@ -50,7 +46,7 @@ export function ForecastForm({ stations, selected, date, minDate, maxDate }: For
           className={field}
         />
       </div>
-      <button type="submit" className={`${buttonStyles.primary} min-h-12`}>
+      <button type="submit" className={`${buttonStyles.primary} min-h-12 w-full`}>
         <Search aria-hidden="true" className="size-5" />
         Ver previsión
       </button>

@@ -114,6 +114,8 @@ describe("API client", () => {
 });
 
 describe("home data", () => {
+  const TODAY = "2026-10-27";
+
   function api(forecastStatus = 200) {
     return mockFetch((url) => {
       if (url.pathname.endsWith("/stations")) return json(STATIONS);
@@ -121,37 +123,46 @@ describe("home data", () => {
       const id = Number(url.pathname.split("/")[4]);
       const direction = Number(url.searchParams.get("direction"));
       const station = STATIONS.find((s) => s.station_id === id && s.direction === direction)!;
-      return forecastStatus === 200
-        ? json(dayForecast(undefined, station))
-        : json({}, forecastStatus);
+      const date = url.searchParams.get("date") ?? TODAY;
+      return forecastStatus === 200 ? json(dayForecast(date, station)) : json({}, forecastStatus);
     });
   }
 
   it("features the configured station", async () => {
     vi.stubEnv("TFFLOW_FEATURED_STATION", "57:-1");
     api();
-    const data = await getHomeData();
-    expect(data.forecast?.station).toEqual(STATIONS[1]);
+    const data = await getHomeData(TODAY);
+    expect(data.outlook?.forecast.station).toEqual(STATIONS[1]);
+    expect(data.outlook?.forecast.date).toBe(TODAY);
+    expect(data.outlook?.days.map((d) => d.date)).toEqual([
+      "2026-10-27",
+      "2026-10-28",
+      "2026-10-29",
+      "2026-10-30",
+      "2026-10-31",
+      "2026-11-01",
+      "2026-11-02",
+    ]);
     expect(data.model).toEqual(MODEL);
   });
 
   it("falls back to the first station in order", async () => {
     api();
-    expect((await getHomeData()).forecast?.station).toEqual(STATIONS[2]);
+    expect((await getHomeData(TODAY)).outlook?.forecast.station).toEqual(STATIONS[2]);
   });
 
   it("still renders when the forecast fails", async () => {
     api(503);
-    const data = await getHomeData();
+    const data = await getHomeData(TODAY);
     expect(data.stations).toHaveLength(3);
-    expect(data.forecast).toBeUndefined();
+    expect(data.outlook).toBeUndefined();
   });
 
   it("still renders when the API is down", async () => {
     mockFetch(() => Promise.reject(new TypeError("fetch failed")));
     await expect(getHomeData()).resolves.toEqual({
       stations: [],
-      forecast: undefined,
+      outlook: undefined,
       model: undefined,
     });
   });

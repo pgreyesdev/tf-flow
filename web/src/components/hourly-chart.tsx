@@ -55,7 +55,7 @@ export function HourlyChart({
 
   return (
     <figure className="w-full">
-      <div className="flex items-baseline justify-between gap-4 text-sm text-muted">
+      <div className="flex items-baseline justify-between gap-4 text-sm text-ink-soft">
         <span className="tabular">{formatVehicles(peak)} veh/h</span>
         {!compact && <span aria-hidden="true">Vehículos por hora</span>}
       </div>
@@ -73,7 +73,7 @@ export function HourlyChart({
             x2={width}
             y1={HEIGHT * f}
             y2={HEIGHT * f}
-            className="stroke-border"
+            className="stroke-glass-line"
             strokeWidth="1"
             vectorEffect="non-scaling-stroke"
           />
@@ -89,7 +89,7 @@ export function HourlyChart({
               width={BAR}
               height={h}
               rx="1.2"
-              className={cx(FILLS[hour.level], isHighlight && "stroke-foreground")}
+              className={cx(FILLS[hour.level], isHighlight && "stroke-ink")}
               strokeWidth={isHighlight ? 2 : 0}
               vectorEffect="non-scaling-stroke"
               data-level={hour.level}
@@ -101,7 +101,7 @@ export function HourlyChart({
           );
         })}
       </svg>
-      <div aria-hidden="true" className="mt-1.5 flex text-xs text-muted tabular">
+      <div aria-hidden="true" className="mt-1.5 flex text-xs text-ink-soft tabular">
         {hours.map((hour) => (
           <span key={hour.time} className="flex-1 text-center">
             {hourOf(hour.time) % (compact ? 6 : 3) === 0 ? hourOf(hour.time) : ""}
@@ -110,7 +110,7 @@ export function HourlyChart({
       </div>
       {!compact && (
         <>
-          <figcaption className="mt-4 flex flex-wrap gap-x-5 gap-y-2 text-sm text-muted">
+          <figcaption className="mt-4 flex flex-wrap gap-x-5 gap-y-2 text-sm text-ink-soft">
             {(Object.keys(LEVEL_INFO) as Level[]).map((level) => (
               <span key={level} className="inline-flex items-center gap-1.5">
                 <span className={cx("size-3 rounded-sm", SWATCHES[level])} />
@@ -120,19 +120,19 @@ export function HourlyChart({
             ))}
             {highlight && (
               <span className="inline-flex items-center gap-1.5">
-                <span className="size-3 rounded-sm border-2 border-foreground" />
+                <span className="size-3 rounded-sm border-2 border-ink" />
                 {highlightLabel}
               </span>
             )}
           </figcaption>
-          <details className="mt-4 rounded-xl border border-border bg-surface">
+          <details className="mt-4 rounded-xl border border-glass-line bg-glass">
             <summary className="cursor-pointer px-4 py-3 font-semibold">
               Ver los datos hora a hora
             </summary>
             <div className="overflow-x-auto px-4 pb-4">
               <table className="w-full text-left text-sm tabular">
                 <caption className="sr-only">{title}</caption>
-                <thead className="text-muted">
+                <thead className="text-ink-soft">
                   <tr>
                     <th scope="col" className="py-2 pr-4 font-semibold">
                       Hora
@@ -150,7 +150,7 @@ export function HourlyChart({
                 </thead>
                 <tbody>
                   {hours.map((hour) => (
-                    <tr key={hour.time} className="border-t border-border">
+                    <tr key={hour.time} className="border-t border-glass-line">
                       <th scope="row" className="py-1.5 pr-4 font-normal">
                         {hourLabel(hour.time)}
                       </th>

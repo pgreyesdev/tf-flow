@@ -3,9 +3,14 @@ import {
   calmestDaytimeHour,
   congestedRanges,
   dayFocus,
+  daySentence,
   formatRange,
+  headlineHour,
   peakVehicles,
+  summarizeDay,
+  upcomingHours,
 } from "@/lib/forecast";
+import { hourOf } from "@/lib/format";
 import { dayForecast, hourly } from "@/test/fixtures";
 
 describe("forecast helpers", () => {
@@ -61,5 +66,52 @@ describe("dayFocus", () => {
     });
     expect(busiestHour([])).toBeUndefined();
     expect(dayFocus({ hours: [], worst_hour: forecast.worst_hour }).hour).toBe(forecast.worst_hour);
+  });
+});
+
+describe("weather-style helpers", () => {
+  const forecast = dayForecast();
+
+  it("summarises a day by its worst level and risk range", () => {
+    expect(summarizeDay(forecast)).toEqual({
+      date: "2026-10-27",
+      level: "high",
+      minRisk: 0.02,
+      maxRisk: 0.88,
+      peakVehicles: 3008,
+    });
+    expect(summarizeDay({ date: "2026-10-28", hours: [] })).toMatchObject({
+      level: "low",
+      minRisk: 0,
+      maxRisk: 0,
+    });
+  });
+
+  it("starts today's strip at the current hour", () => {
+    expect(upcomingHours(forecast.hours, true, 9).map((h) => hourOf(h.time))[0]).toBe(9);
+    expect(upcomingHours(forecast.hours, true, 22).map((h) => hourOf(h.time))).toEqual([
+      16, 17, 18, 19, 20, 21, 22, 23,
+    ]);
+    expect(upcomingHours(forecast.hours, false, 20)).toHaveLength(24);
+    expect(upcomingHours(forecast.hours.slice(0, 3), true, 20)).toHaveLength(3);
+  });
+
+  it("headlines the current hour today and the key hour otherwise", () => {
+    expect(hourOf(headlineHour(forecast, true, 14).time)).toBe(14);
+    expect(hourOf(headlineHour(forecast, false, 14).time)).toBe(8);
+  });
+
+  it("sums up the day in one sentence", () => {
+    expect(daySentence(forecast.hours)).toBe(
+      "Atasco fuerte previsto de 07:00 a 09:00. Hora más tranquila: 10:00.",
+    );
+    const dense = forecast.hours.map(
+      (h) => ({ ...h, level: h.level === "high" ? "medium" : h.level }) as const,
+    );
+    expect(daySentence(dense)).toMatch(
+      /^Sin atascos fuertes, pero con tráfico denso de 06:00 a 10:00 y de 14:00 a 15:00\./,
+    );
+    const calm = forecast.hours.map((h) => ({ ...h, level: "low" }) as const);
+    expect(daySentence(calm)).toBe("Tráfico fluido durante todo el día.");
   });
 });

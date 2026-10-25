@@ -1,106 +1,71 @@
 @import "tailwindcss";
 
 /*
- * Sistema de diseño de TF-FLOW: servicio público, legible y de alto contraste.
- * Azul noche y azul océano para la marca; verde, ámbar y rojo solo para el estado del tráfico,
- * siempre acompañados de texto e icono. Todos los textos cumplen al menos 4,5:1 en ambos temas.
+ * Sistema de diseño de TF-FLOW: «el tiempo del tráfico».
+ * Como en una app del tiempo, el cielo de fondo cuenta cómo está la carretera: azul océano si va
+ * fluida, atardecer ámbar si va densa y rojo si hay atasco. Encima, tarjetas de cristal con texto
+ * blanco. Verde, ámbar y rojo marcan el estado del tráfico, siempre con texto e icono.
+ * Contraste comprobado: texto principal ≥ 7:1 y secundario ≥ 4,5:1 sobre el tramo más claro del
+ * cielo con el cristal encima.
  */
 
 :root {
-    color-scheme: light;
-    --background: #f8fafc;
-    --surface: #ffffff;
-    --surface-muted: #eef2f6;
-    --foreground: #020617;
-    --muted: #475569;
-    --border: #e2e8f0;
-    --border-strong: #cbd5e1;
-    --primary: #0f172a;
-    --on-primary: #ffffff;
-    --accent: #0369a1;
-    --accent-hover: #075985;
-    --on-accent: #ffffff;
-    --accent-soft: #e0f2fe;
-    --ring: #0369a1;
-    --low: #15803d;
-    --low-soft: #dcfce7;
-    --medium: #b45309;
-    --medium-soft: #fef3c7;
-    --high: #b91c1c;
-    --high-soft: #fee2e2;
-}
-
-@media (prefers-color-scheme: dark) {
-    :root {
-        color-scheme: dark;
-        --background: #020617;
-        --surface: #0b1324;
-        --surface-muted: #111c33;
-        --foreground: #f1f5f9;
-        --muted: #a3b1c6;
-        --border: #1e293b;
-        --border-strong: #334155;
-        --primary: #e2e8f0;
-        --on-primary: #020617;
-        --accent: #38bdf8;
-        --accent-hover: #7dd3fc;
-        --on-accent: #020617;
-        --accent-soft: #0c2a43;
-        --ring: #7dd3fc;
-        --low: #4ade80;
-        --low-soft: #0d2b1b;
-        --medium: #fbbf24;
-        --medium-soft: #33240a;
-        --high: #f87171;
-        --high-soft: #3b1212;
-    }
+    color-scheme: dark;
+    --ink: #ffffff;
+    --ink-soft: rgb(255 255 255 / 0.86);
+    --glass: rgb(255 255 255 / 0.1);
+    --glass-strong: rgb(255 255 255 / 0.16);
+    --glass-line: rgb(255 255 255 / 0.18);
+    --night: #050b18;
+    --low: #4ade80;
+    --low-ink: #052e16;
+    --medium: #fbbf24;
+    --medium-ink: #3b2203;
+    --high: #fb7185;
+    --high-ink: #4c0519;
+    --accent: #7dd3fc;
+    --accent-ink: #082f49;
 }
 
 @theme inline {
-    --color-background: var(--background);
-    --color-surface: var(--surface);
-    --color-surface-muted: var(--surface-muted);
-    --color-foreground: var(--foreground);
-    --color-muted: var(--muted);
-    --color-border: var(--border);
-    --color-border-strong: var(--border-strong);
-    --color-primary: var(--primary);
-    --color-on-primary: var(--on-primary);
-    --color-accent: var(--accent);
-    --color-accent-hover: var(--accent-hover);
-    --color-on-accent: var(--on-accent);
-    --color-accent-soft: var(--accent-soft);
-    --color-ring: var(--ring);
+    --color-ink: var(--ink);
+    --color-ink-soft: var(--ink-soft);
+    --color-glass: var(--glass);
+    --color-glass-strong: var(--glass-strong);
+    --color-glass-line: var(--glass-line);
+    --color-night: var(--night);
     --color-low: var(--low);
-    --color-low-soft: var(--low-soft);
+    --color-low-ink: var(--low-ink);
     --color-medium: var(--medium);
-    --color-medium-soft: var(--medium-soft);
+    --color-medium-ink: var(--medium-ink);
     --color-high: var(--high);
-    --color-high-soft: var(--high-soft);
-    --font-sans: var(--font-atkinson), ui-sans-serif, system-ui, sans-serif;
-    --font-mono: var(--font-atkinson-mono), ui-monospace, monospace;
+    --color-high-ink: var(--high-ink);
+    --color-accent: var(--accent);
+    --color-accent-ink: var(--accent-ink);
+    --font-sans: var(--font-manrope), ui-sans-serif, system-ui, sans-serif;
+    --font-display: var(--font-display), var(--font-manrope), ui-sans-serif, sans-serif;
 }
 
 @layer base {
     html {
-        scroll-padding-top: 5rem;
+        scroll-padding-top: 6rem;
+        background: var(--night);
     }
 
     body {
-        background: var(--background);
-        color: var(--foreground);
+        color: var(--ink);
         font-family: var(--font-sans);
         font-size: 1.0625rem;
         line-height: 1.6;
-        text-rendering: optimizeLegibility;
+        min-height: 100dvh;
     }
 
     h1,
     h2,
     h3 {
         text-wrap: balance;
-        line-height: 1.15;
-        letter-spacing: -0.015em;
+        line-height: 1.1;
+        letter-spacing: -0.02em;
     }
 
     p {
@@ -108,9 +73,9 @@
     }
 
     :focus-visible {
-        outline: 3px solid var(--ring);
+        outline: 3px solid var(--accent);
         outline-offset: 3px;
-        border-radius: 6px;
+        border-radius: 10px;
     }
 
     @media (prefers-reduced-motion: no-preference) {
@@ -120,6 +85,118 @@
     }
 }
 
+/* El cielo: un degradado por nivel y dos luces que se mueven despacio. */
+@layer components {
+    .sky {
+        position: fixed;
+        inset: 0;
+        z-index: -1;
+        overflow: hidden;
+        background: linear-gradient(
+            180deg,
+            var(--sky-top) 0%,
+            var(--sky-mid) 55%,
+            var(--sky-bottom) 100%
+        );
+        transition: background 600ms ease;
+    }
+
+    .sky::before,
+    .sky::after {
+        content: "";
+        position: absolute;
+        width: 70vmax;
+        height: 70vmax;
+        border-radius: 9999px;
+        filter: blur(80px);
+        opacity: 0.45;
+    }
+
+    .sky::before {
+        top: -30vmax;
+        right: -20vmax;
+        background: radial-gradient(circle, var(--sky-glow) 0%, transparent 65%);
+    }
+
+    .sky::after {
+        bottom: -35vmax;
+        left: -25vmax;
+        background: radial-gradient(circle, var(--sky-glow-2) 0%, transparent 65%);
+    }
+
+    @media (prefers-reduced-motion: no-preference) {
+        .sky::before {
+            animation: drift 28s ease-in-out infinite alternate;
+        }
+        .sky::after {
+            animation: drift 34s ease-in-out infinite alternate-reverse;
+        }
+    }
+
+    .sky-low {
+        --sky-top: #061a33;
+        --sky-mid: #0a3556;
+        --sky-bottom: #0e4f63;
+        --sky-glow: #38bdf8;
+        --sky-glow-2: #2dd4bf;
+    }
+
+    .sky-medium {
+        --sky-top: #160d2b;
+        --sky-mid: #3f2236;
+        --sky-bottom: #6a3920;
+        --sky-glow: #f59e0b;
+        --sky-glow-2: #c084fc;
+    }
+
+    .sky-high {
+        --sky-top: #1a0820;
+        --sky-mid: #45122c;
+        --sky-bottom: #6e1b28;
+        --sky-glow: #f43f5e;
+        --sky-glow-2: #fb923c;
+    }
+
+    .glass {
+        background: var(--glass);
+        border: 1px solid var(--glass-line);
+        border-radius: 1.5rem;
+        backdrop-filter: blur(24px) saturate(140%);
+        -webkit-backdrop-filter: blur(24px) saturate(140%);
+    }
+
+    .scroll-x {
+        scrollbar-width: none;
+        scroll-snap-type: x proximity;
+        overscroll-behavior-x: contain;
+    }
+
+    .scroll-x::-webkit-scrollbar {
+        display: none;
+    }
+}
+
+@keyframes drift {
+    from {
+        transform: translate3d(0, 0, 0) scale(1);
+    }
+    to {
+        transform: translate3d(-8vmax, 6vmax, 0) scale(1.15);
+    }
+}
+
 @utility tabular {
     font-variant-numeric: tabular-nums;
+}
+
+/* Los desplegables nativos no heredan el cristal: fondo oscuro para que se lean. */
+@layer base {
+    option {
+        background: var(--night);
+        color: var(--ink);
+    }
+
+    input[type="date"]::-webkit-calendar-picker-indicator {
+        filter: invert(1);
+    }
 }

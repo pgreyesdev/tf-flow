@@ -16,8 +16,8 @@ describe("HourlyChart", () => {
     const bars = container.querySelectorAll("rect");
     expect(bars).toHaveLength(24);
     expect(bars[8]).toHaveAttribute("data-level", "high");
-    expect(bars[8]).toHaveClass("stroke-foreground");
-    expect(bars[3]).not.toHaveClass("stroke-foreground");
+    expect(bars[8]).toHaveClass("stroke-ink");
+    expect(bars[3]).not.toHaveClass("stroke-ink");
     expect(screen.getByRole("img")).toHaveAccessibleName(/Martes\. Máximo de 3008 vehículos/);
   });
 

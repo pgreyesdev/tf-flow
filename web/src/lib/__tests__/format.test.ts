@@ -7,6 +7,8 @@ import {
   hourLabel,
   hourOf,
   isIsoDate,
+  currentHourInTenerife,
+  shortWeekday,
   todayInTenerife,
 } from "@/lib/format";
 
@@ -43,5 +45,12 @@ describe("format", () => {
     expect(isIsoDate("2026-02-30")).toBe(false);
     expect(isIsoDate("27/10/2026")).toBe(false);
     expect(isIsoDate("2026-13-01")).toBe(false);
+  });
+
+  it("tells the hour and weekday in the Canaries", () => {
+    // 23:30 UTC en verano (WEST, UTC+1) ya es medianoche y media en Tenerife.
+    expect(currentHourInTenerife(new Date("2026-07-01T23:30:00Z"))).toBe(0);
+    expect(currentHourInTenerife(new Date("2026-12-01T08:10:00Z"))).toBe(8);
+    expect(shortWeekday("2026-10-27")).toBe("mar");
   });
 });

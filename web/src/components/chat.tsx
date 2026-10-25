@@ -73,7 +73,7 @@ export function Chat({ send }: ChatProps) {
   }
 
   return (
-    <div className="flex flex-col rounded-3xl border border-border bg-surface">
+    <div className="glass flex flex-col">
       <div
         role="log"
         aria-live="polite"
@@ -89,7 +89,7 @@ export function Chat({ send }: ChatProps) {
                   <button
                     type="button"
                     onClick={() => submit(suggestion)}
-                    className="min-h-11 cursor-pointer rounded-full border border-border-strong px-4 py-2 text-left transition-colors duration-200 hover:bg-surface-muted"
+                    className="min-h-11 cursor-pointer rounded-full border border-glass-line px-4 py-2 text-left transition-colors duration-200 hover:bg-glass"
                   >
                     {suggestion}
                   </button>
@@ -102,7 +102,7 @@ export function Chat({ send }: ChatProps) {
           <Message key={i} entry={entry} />
         ))}
         {pending && (
-          <p className="flex items-center gap-2 text-muted">
+          <p className="flex items-center gap-2 text-ink-soft">
             <LoaderCircle
               aria-hidden="true"
               className="size-5 animate-spin motion-reduce:animate-none"
@@ -114,13 +114,13 @@ export function Chat({ send }: ChatProps) {
       </div>
 
       {error && (
-        <p role="alert" className="mx-4 mb-3 rounded-xl bg-high-soft px-4 py-3 text-high sm:mx-6">
+        <p role="alert" className="mx-4 mb-3 rounded-xl bg-high/15 px-4 py-3 text-high sm:mx-6">
           {error}
         </p>
       )}
 
       <form
-        className="border-t border-border p-4 sm:p-6"
+        className="border-t border-glass-line p-4 sm:p-6"
         onSubmit={(event) => {
           event.preventDefault();
           submit(draft);
@@ -144,10 +144,10 @@ export function Chat({ send }: ChatProps) {
           rows={2}
           aria-describedby={counterId}
           placeholder="Por ejemplo: ¿habrá atasco el lunes a las 8 en la TF-1?"
-          className="mt-1.5 block w-full resize-y rounded-xl border border-border-strong bg-background px-3.5 py-3 text-base"
+          className="mt-1.5 block w-full resize-y rounded-xl border border-glass-line bg-glass px-3.5 py-3 text-base placeholder:text-ink-soft"
         />
         <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-          <span id={counterId} className="text-sm text-muted tabular">
+          <span id={counterId} className="text-sm text-ink-soft tabular">
             {draft.length}/{MAX_MESSAGE_LENGTH} caracteres · Intro para enviar
           </span>
           <div className="flex gap-2">
@@ -182,7 +182,7 @@ function Message({ entry }: { entry: Entry }) {
         aria-hidden="true"
         className={cx(
           "flex size-9 shrink-0 items-center justify-center rounded-full",
-          mine ? "bg-accent text-on-accent" : "bg-surface-muted text-foreground",
+          mine ? "bg-accent text-accent-ink" : "bg-glass text-ink",
         )}
       >
         <Icon className="size-5" />
@@ -192,13 +192,13 @@ function Message({ entry }: { entry: Entry }) {
         <p
           className={cx(
             "inline-block rounded-2xl px-4 py-3 text-left whitespace-pre-line",
-            mine ? "rounded-tr-md bg-accent text-on-accent" : "rounded-tl-md bg-surface-muted",
+            mine ? "rounded-tr-md bg-accent text-accent-ink" : "rounded-tl-md bg-glass",
           )}
         >
           {entry.content}
         </p>
         {tools.length > 0 && (
-          <p className="mt-1 text-sm text-muted">El asistente {tools.join(" y ")}.</p>
+          <p className="mt-1 text-sm text-ink-soft">El asistente {tools.join(" y ")}.</p>
         )}
       </div>
     </div>

@@ -26,11 +26,15 @@ nada que permita gastar el presupuesto del asistente o inyectar código.
 - **Única excepción de estilo en línea:** React esconde los trozos SVG que envía por partes con
   `style="display:none"`. Se permite ese atributo exacto por su huella SHA-256
   (`style-src-attr 'unsafe-hashes'`), no cualquier estilo.
-- **Sistema de diseño accesible:** Atkinson Hyperlegible (servida desde el propio dominio), azul
-  noche y azul océano para la marca, y verde, ámbar y rojo solo para el estado del tráfico, siempre
-  con texto e icono. Contraste mínimo 4,5:1 en modo claro y oscuro, foco visible y respeto a
-  `prefers-reduced-motion`. La gráfica hora a hora es SVG sin dependencias y lleva una tabla con
-  los mismos datos.
+- **Sistema de diseño «el tiempo del tráfico»:** la previsión se lee como el parte de una app del
+  tiempo. El fondo es un cielo cuyo degradado cambia con el nivel de la hora actual (azul si va
+  fluido, ámbar si va denso, rojo si hay atasco); encima, tarjetas de cristal con texto blanco, un
+  porcentaje grande de riesgo, una tira hora a hora deslizable y los próximos siete días con su
+  franja de riesgo mínimo y máximo. Manrope para el texto y Plus Jakarta Sans para los titulares,
+  servidas desde el propio dominio. Verde, ámbar y rojo marcan el estado del tráfico, siempre con
+  texto e icono. Contraste mínimo 4,5:1 sobre el tramo más claro del cielo, foco visible y respeto
+  a `prefers-reduced-motion` (el cielo deja de moverse). La gráfica hora a hora es SVG sin
+  dependencias y lleva una tabla con los mismos datos.
 - **Calidad:** ESLint con las reglas de Next.js y de accesibilidad, Prettier, Vitest con Testing
   Library (cobertura mínima del 90 %), `pnpm audit` y la imagen Docker escaneada con Trivy en el CI.
 

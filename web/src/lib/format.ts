@@ -62,6 +62,23 @@ export function todayInTenerife(now: Date = new Date()): string {
   return isoInTenerife.format(now);
 }
 
+const hourInTenerife = new Intl.DateTimeFormat("en-GB", {
+  hour: "2-digit",
+  hourCycle: "h23",
+  timeZone: TIMEZONE,
+});
+const weekdayShort = new Intl.DateTimeFormat(LOCALE, { weekday: "short", timeZone: "UTC" });
+
+/** Hora actual en Tenerife, de 0 a 23. */
+export function currentHourInTenerife(now: Date = new Date()): number {
+  return Number(hourInTenerife.format(now)) % 24;
+}
+
+/** `2026-10-27` → `mar`. */
+export function shortWeekday(isoDate: string): string {
+  return weekdayShort.format(utcDate(isoDate)).replace(".", "");
+}
+
 export function addDays(isoDate: string, days: number): string {
   const date = utcDate(isoDate);
   date.setUTCDate(date.getUTCDate() + days);

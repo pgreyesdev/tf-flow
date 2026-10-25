@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Atkinson_Hyperlegible_Mono, Atkinson_Hyperlegible_Next } from "next/font/google";
+import { Manrope, Plus_Jakarta_Sans } from "next/font/google";
 import { connection } from "next/server";
 
 import { SiteFooter } from "@/components/site-footer";
@@ -8,21 +8,16 @@ import { serverEnv } from "@/lib/env";
 
 import "./globals.css";
 
-const sans = Atkinson_Hyperlegible_Next({
-  variable: "--font-atkinson",
+const sans = Manrope({
+  variable: "--font-manrope",
   subsets: ["latin", "latin-ext"],
   display: "swap",
-  // next/font no trae métricas de esta familia para ajustar la fuente de reserva.
-  adjustFontFallback: false,
-  fallback: ["system-ui", "sans-serif"],
 });
 
-const mono = Atkinson_Hyperlegible_Mono({
-  variable: "--font-atkinson-mono",
-  subsets: ["latin"],
+const display = Plus_Jakarta_Sans({
+  variable: "--font-display",
+  subsets: ["latin", "latin-ext"],
   display: "swap",
-  adjustFontFallback: false,
-  fallback: ["ui-monospace", "monospace"],
 });
 
 const DESCRIPTION =
@@ -47,21 +42,18 @@ export function generateMetadata(): Metadata {
 }
 
 export const viewport: Viewport = {
-  themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#f8fafc" },
-    { media: "(prefers-color-scheme: dark)", color: "#020617" },
-  ],
+  themeColor: [{ color: "#061a33" }],
 };
 
 export default async function RootLayout({ children }: LayoutProps<"/">) {
   // La CSP lleva un nonce por petición, así que todas las páginas se generan al pedirlas.
   await connection();
   return (
-    <html lang="es" className={`${sans.variable} ${mono.variable} h-full antialiased`}>
+    <html lang="es" className={`${sans.variable} ${display.variable} h-full antialiased`}>
       <body className="flex min-h-full flex-col">
         <a
           href="#contenido"
-          className="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-4 focus:z-50 focus:rounded-lg focus:bg-accent focus:px-4 focus:py-2 focus:text-on-accent"
+          className="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-4 focus:z-50 focus:rounded-lg focus:bg-white focus:px-4 focus:py-2 focus:text-night"
         >
           Saltar al contenido
         </a>

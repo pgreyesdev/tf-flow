@@ -1,5 +1,5 @@
 import type { HourlyForecast, Level } from "@/lib/api/schemas";
-import { hourOf } from "@/lib/format";
+import { hourLabel, hourOf } from "@/lib/format";
 
 export interface HourRange {
   from: string;
@@ -82,4 +82,84 @@ export function dayFocus(forecast: {
     return { hour: forecast.worst_hour, kind: "risk" };
   }
   return { hour: busiestHour(forecast.hours) ?? forecast.worst_hour, kind: "traffic" };
+}
+
+export interface DaySummary {
+  date: string;
+  /** Peor nivel previsto en el día. */
+  level: Level;
+  minRisk: number;
+  maxRisk: number;
+  peakVehicles: number;
+}
+
+const RANK: Record<Level, number> = { low: 0, medium: 1, high: 2 };
+
+export function summarizeDay(forecast: { date: string; hours: HourlyForecast[] }): DaySummary {
+  const risks = forecast.hours.map((h) => h.probability_high);
+  return {
+    date: forecast.date,
+    level: forecast.hours.reduce<Level>(
+      (worst, h) => (RANK[h.level] > RANK[worst] ? h.level : worst),
+      "low",
+    ),
+    minRisk: risks.length ? Math.min(...risks) : 0,
+    maxRisk: risks.length ? Math.max(...risks) : 0,
+    peakVehicles: peakVehicles(forecast.hours),
+  };
+}
+
+/** Mínimo de horas en la tira, para que a última hora no se quede casi vacía. */
+const MIN_STRIP_HOURS = 8;
+
+/**
+ * Horas que se muestran en la tira horaria: hoy, desde la hora actual (o las últimas horas del día,
+ * si quedan pocas); otro día, el día entero.
+ */
+export function upcomingHours(
+  hours: HourlyForecast[],
+  isToday: boolean,
+  currentHour: number,
+): HourlyForecast[] {
+  if (!isToday) {
+    return hours;
+  }
+  const start = Math.min(currentHour, 24 - MIN_STRIP_HOURS);
+  const rest = hours.filter((h) => hourOf(h.time) >= start);
+  return rest.length > 0 ? rest : hours;
+}
+
+/** La hora que representa «ahora» en la cabecera: la actual si es hoy, si no la clave del día. */
+export function headlineHour(
+  forecast: { hours: HourlyForecast[]; worst_hour: HourlyForecast },
+  isToday: boolean,
+  currentHour: number,
+): HourlyForecast {
+  if (isToday) {
+    const now = forecast.hours.find((h) => hourOf(h.time) === currentHour);
+    if (now) {
+      return now;
+    }
+  }
+  return dayFocus(forecast).hour;
+}
+
+/** Frase de resumen del día, como «Lluvia a partir de las 17:00» en una app del tiempo. */
+export function daySentence(hours: HourlyForecast[]): string {
+  const jams = congestedRanges(hours, "high");
+  const dense = congestedRanges(hours, "medium");
+  const calm = calmestDaytimeHour(hours);
+  const advice = calm ? ` Hora más tranquila: ${hourLabel(calm.time)}.` : "";
+  if (jams.length > 0) {
+    return `Atasco fuerte previsto ${listRanges(jams)}.${advice}`;
+  }
+  if (dense.length > 0) {
+    return `Sin atascos fuertes, pero con tráfico denso ${listRanges(dense)}.${advice}`;
+  }
+  return "Tráfico fluido durante todo el día.";
+}
+
+function listRanges(ranges: HourRange[]): string {
+  const parts = ranges.map((r) => `de ${r.from} a ${r.to}`);
+  return parts.length > 1 ? `${parts.slice(0, -1).join(", ")} y ${parts.at(-1)}` : (parts[0] ?? "");
 }

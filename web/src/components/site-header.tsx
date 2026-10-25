@@ -11,18 +11,18 @@ const NAV = [
 
 export function SiteHeader() {
   return (
-    <header className="sticky top-0 z-40 border-b border-border bg-background/90 backdrop-blur supports-[backdrop-filter]:bg-background/75">
-      <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-x-6 gap-y-1 px-4 py-2.5 sm:px-6">
-        <Link href="/" className="rounded-lg py-1" aria-label="TF-FLOW, inicio">
+    <header className="relative z-40 px-3 pt-3 sm:sticky sm:top-0 sm:px-6">
+      <div className="glass mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-x-4 gap-y-1 rounded-full bg-night/70 py-1.5 pr-1.5 pl-4 max-sm:rounded-3xl">
+        <Link href="/" className="rounded-full py-1" aria-label="TF-FLOW, inicio">
           <Logo />
         </Link>
-        <nav aria-label="Principal" className="-mx-2 overflow-x-auto">
-          <ul className="flex items-center gap-1 text-[0.975rem] whitespace-nowrap">
+        <nav aria-label="Principal" className="-mx-1 overflow-x-auto">
+          <ul className="flex items-center gap-0.5 text-[0.95rem] whitespace-nowrap">
             {NAV.map((item) => (
               <li key={item.href}>
                 <Link
                   href={item.href}
-                  className="inline-flex min-h-11 items-center rounded-lg px-3 font-medium text-muted transition-colors duration-200 hover:bg-surface-muted hover:text-foreground"
+                  className="inline-flex min-h-11 items-center rounded-full px-3.5 font-semibold text-ink-soft transition-colors duration-200 hover:bg-glass hover:text-ink"
                 >
                   {item.label}
                 </Link>

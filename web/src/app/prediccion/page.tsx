@@ -1,16 +1,16 @@
-import { CalendarDays, Info } from "lucide-react";
+import { ChevronDown, MapPin } from "lucide-react";
 import type { Metadata } from "next";
-import Link from "next/link";
 
 import { ForecastForm } from "@/components/forecast-form";
-import { ForecastInsights } from "@/components/forecast-insights";
-import { HourlyChart } from "@/components/hourly-chart";
 import { Notice } from "@/components/notice";
-import { ApiError, getDayForecast, getStations } from "@/lib/api/client";
-import { dayFocus } from "@/lib/forecast";
-import type { DayForecast, Station } from "@/lib/api/schemas";
+import { Sky } from "@/components/sky";
+import { TrafficWeather } from "@/components/traffic-weather";
+import { ApiError, getStations } from "@/lib/api/client";
+import { getOutlook, type Outlook } from "@/lib/api/outlook";
+import type { Station } from "@/lib/api/schemas";
 import { serverEnv } from "@/lib/env";
-import { addDays, formatLongDate, formatShortDate, isIsoDate, todayInTenerife } from "@/lib/format";
+import { headlineHour } from "@/lib/forecast";
+import { addDays, currentHourInTenerife, isIsoDate, todayInTenerife } from "@/lib/format";
 import {
   findStation,
   parseStationKey,
@@ -18,7 +18,6 @@ import {
   stationKey,
   stationLabel,
 } from "@/lib/stations";
-import { cx } from "@/lib/ui";
 
 export const metadata: Metadata = {
   title: "Previsión por estación",
@@ -42,11 +41,11 @@ function first(value: string | string[] | undefined): string | undefined {
   return Array.isArray(value) ? value[0] : value;
 }
 
-type Result = { forecast: DayForecast } | { error: string };
+type Result = Outlook | { error: string };
 
-async function loadForecast(station: Station, date: string): Promise<Result> {
+async function loadOutlook(station: Station, date: string, today: string): Promise<Result> {
   try {
-    return { forecast: await getDayForecast(station.station_id, station.direction, date) };
+    return await getOutlook(station, date, today);
   } catch (error) {
     if (error instanceof ApiError) {
       return { error: ERROR_MESSAGES[error.kind] };
@@ -70,6 +69,10 @@ export default async function ForecastPage({ searchParams }: PageProps<"/predicc
     }
     return (
       <PageShell>
+        <Sky />
+        <h1 className="pt-4 font-display text-3xl font-extrabold sm:text-4xl">
+          Previsión por estación
+        </h1>
         <Notice tone="error" title="No podemos cargar las estaciones">
           {ERROR_MESSAGES[error.kind]}
         </Notice>
@@ -87,18 +90,45 @@ export default async function ForecastPage({ searchParams }: PageProps<"/predicc
     stations[0];
   const unknownStation = ref !== null && !findStation(stations, ref);
 
-  const result = station ? await loadForecast(station, date) : undefined;
+  const result = station ? await loadOutlook(station, date, today) : undefined;
+  const currentHour = currentHourInTenerife();
+
+  const level =
+    result && "forecast" in result
+      ? headlineHour(result.forecast, result.forecast.date === today, currentHour).level
+      : undefined;
 
   return (
     <PageShell>
-      <ForecastForm
-        stations={stations}
-        selected={station && stationKey(station)}
-        date={date}
-        minDate={minDate}
-        maxDate={maxDate}
-      />
-      {station && <DayLinks station={station} today={today} current={date} />}
+      <Sky level={level} />
+
+      {station && (
+        <details
+          className="glass group mx-auto w-full max-w-xl p-0"
+          open={!(result && "forecast" in result)}
+        >
+          <summary className="flex min-h-12 cursor-pointer list-none items-center gap-2 px-4 py-2 font-semibold [&::-webkit-details-marker]:hidden">
+            <MapPin aria-hidden="true" className="size-5 shrink-0 text-accent" />
+            <span className="min-w-0 flex-1 truncate">
+              <span className="sr-only">Cambiar punto de medida o día. Ahora: </span>
+              {stationLabel(station)}
+            </span>
+            <ChevronDown
+              aria-hidden="true"
+              className="size-5 shrink-0 transition-transform duration-200 group-open:rotate-180"
+            />
+          </summary>
+          <div className="border-t border-glass-line p-4">
+            <ForecastForm
+              stations={stations}
+              selected={stationKey(station)}
+              date={date}
+              minDate={minDate}
+              maxDate={maxDate}
+            />
+          </div>
+        </details>
+      )}
 
       {unknownStation && (
         <Notice tone="info" title="Ese punto de medida no está en la lista">
@@ -118,92 +148,22 @@ export default async function ForecastPage({ searchParams }: PageProps<"/predicc
         </Notice>
       )}
 
-      {result && "forecast" in result && <ForecastResult forecast={result.forecast} />}
+      {result && "forecast" in result ? (
+        <TrafficWeather
+          forecast={result.forecast}
+          days={result.days}
+          today={today}
+          currentHour={currentHour}
+        />
+      ) : (
+        <h1 className="pt-4 font-display text-3xl font-extrabold sm:text-4xl">
+          Previsión por estación
+        </h1>
+      )}
     </PageShell>
   );
 }
 
 function PageShell({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="mx-auto max-w-5xl space-y-8 px-4 pt-10 sm:px-6 sm:pt-14">
-      <header>
-        <h1 className="text-3xl font-bold sm:text-4xl">Previsión por estación</h1>
-        <p className="mt-2 max-w-2xl text-lg text-muted">
-          Elige un punto de medida y un día para ver cuántos vehículos se esperan cada hora y cuándo
-          hay riesgo de atasco.
-        </p>
-      </header>
-      {children}
-    </div>
-  );
-}
-
-function DayLinks({
-  station,
-  today,
-  current,
-}: {
-  station: Station;
-  today: string;
-  current: string;
-}) {
-  const days = [
-    { label: "Hoy", date: today },
-    { label: "Mañana", date: addDays(today, 1) },
-    { label: "Pasado mañana", date: addDays(today, 2) },
-  ];
-  return (
-    <nav aria-label="Días cercanos" className="-mt-4 flex flex-wrap gap-2">
-      {days.map((day) => (
-        <Link
-          key={day.date}
-          href={{
-            pathname: "/prediccion",
-            query: { estacion: stationKey(station), fecha: day.date },
-          }}
-          aria-current={day.date === current ? "page" : undefined}
-          className={cx(
-            "inline-flex min-h-11 items-center rounded-full border px-4 font-semibold transition-colors duration-200",
-            day.date === current
-              ? "border-accent bg-accent-soft text-accent"
-              : "border-border-strong text-muted hover:bg-surface-muted hover:text-foreground",
-          )}
-        >
-          {day.label}
-        </Link>
-      ))}
-    </nav>
-  );
-}
-
-function ForecastResult({ forecast }: { forecast: DayForecast }) {
-  const title = `${stationLabel(forecast.station)}, ${formatLongDate(forecast.date)}`;
-  const focus = dayFocus(forecast);
-  return (
-    <section aria-labelledby="result-title" className="space-y-6">
-      <div className="rounded-2xl border border-border bg-surface p-5 sm:p-7">
-        <h2 id="result-title" className="text-2xl font-bold">
-          {stationLabel(forecast.station)}
-        </h2>
-        <p className="mt-1 flex items-center gap-2 text-muted">
-          <CalendarDays aria-hidden="true" className="size-4" />
-          <span className="first-letter:uppercase">{formatLongDate(forecast.date)}</span>
-        </p>
-        <div className="mt-6">
-          <HourlyChart
-            hours={forecast.hours}
-            highlight={focus.hour.time}
-            highlightLabel={focus.kind === "risk" ? "Hora con más riesgo" : "Hora con más tráfico"}
-            title={title}
-          />
-        </div>
-      </div>
-      <ForecastInsights forecast={forecast} />
-      <p className="flex items-start gap-2 text-sm text-muted">
-        <Info aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
-        Previsión hecha con los datos publicados hasta el {formatShortDate(forecast.data_until)}. Es
-        orientativa: un accidente, una obra o un evento pueden cambiar el tráfico real.
-      </p>
-    </section>
-  );
+  return <div className="mx-auto max-w-5xl space-y-4 px-4 pt-2 sm:px-6">{children}</div>;
 }
