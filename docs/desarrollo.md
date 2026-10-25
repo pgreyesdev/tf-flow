@@ -25,3 +25,16 @@ make api       # API en http://localhost:8000/docs
 - Cobertura de tests de al menos el 90 %; el CI falla por debajo.
 - `mypy --strict` sin errores.
 - Ninguna vulnerabilidad alta o crítica en la imagen Docker.
+
+## Datos
+
+Los experimentos trabajan sobre instantáneas locales del portal del Cabildo, nunca directamente
+contra la API:
+
+```bash
+uv run python -m tf_flow_ml.ingestion traffic    # aforos -> data/raw/traffic/AAAAMMDD/
+uv run python -m tf_flow_ml.ingestion stations   # catálogo de estaciones
+```
+
+Cada instantánea guarda `data.parquet` y un `manifest.json` con los ficheros de origen, la fecha de
+descarga, el número de filas y las columnas. La carpeta `data/` no se versiona.
