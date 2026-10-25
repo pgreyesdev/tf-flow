@@ -1,7 +1,7 @@
-# Despliegue de la API en Fly.io. Cambia `app` por el nombre que elegiste en `fly launch`.
+# Despliegue de la API en Fly.io. París (cdg) es la región más cercana que admite recursos nuevos.
 # El modelo vive en un volumen: ver la sección «Despliegue» de docs/desarrollo.md.
-app = "tf-flow-api"
-primary_region = "mad"
+app = "tf-flow"
+primary_region = "cdg"
 
 [build]
   dockerfile = "backend/Dockerfile"

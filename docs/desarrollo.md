@@ -82,11 +82,11 @@ navegador nunca ve la dirección de la API ni el token del asistente.
 
 ### API en Fly.io
 
-`fly.toml` describe la máquina (1 GB, Madrid, se para sin tráfico) y monta el volumen `models` en
+`fly.toml` describe la máquina (1 GB, París, se para sin tráfico) y monta el volumen `models` en
 `/models`. La primera vez:
 
 ```bash
-fly volumes create models --region mad --size 1
+fly volumes create models --region cdg --size 1
 fly deploy                                   # arranca sin modelo: /health dice model_loaded=false
 fly ssh sftp shell                           # dentro: put models/serving.joblib /models/serving.joblib
 fly secrets set \
