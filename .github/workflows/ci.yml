@@ -17,8 +17,8 @@ jobs:
     name: Python · lint, tipos y tests
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v5
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v7
         with:
           enable-cache: true
       - run: uv sync --frozen --python 3.12
@@ -30,7 +30,7 @@ jobs:
         run: uv run mypy
       - name: Tests y cobertura
         run: uv run pytest --cov --cov-report=xml
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: coverage
           path: coverage.xml
@@ -39,11 +39,11 @@ jobs:
     name: Imagen de la API
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Construir imagen
         run: docker build -f backend/Dockerfile -t tf-flow-api:ci .
       - name: Escanear vulnerabilidades
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: tf-flow-api:ci
           severity: CRITICAL,HIGH
@@ -54,7 +54,7 @@ jobs:
     name: Documentación
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v5
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v7
       - run: uv sync --frozen --python 3.12 --only-group docs
       - run: uv run --only-group docs mkdocs build --strict
