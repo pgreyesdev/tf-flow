@@ -33,10 +33,18 @@ jobs:
           uv run python -m tf_flow_ml.reports.profile "$snapshot" --out informe-datos.md
           cat informe-datos.md >> "$GITHUB_STEP_SUMMARY"
           cat informe-datos.md
+      - name: Análisis de congestión
+        run: |
+          snapshot=$(ls -d data/raw/traffic/*/ | tail -n 1)
+          uv run python ml/analysis/congestion_eda.py "$snapshot" > analisis-congestion.md
+          cat analisis-congestion.md >> "$GITHUB_STEP_SUMMARY"
+          cat analisis-congestion.md
       - uses: actions/upload-artifact@v7
         with:
           name: informe-datos
-          path: informe-datos.md
+          path: |
+            informe-datos.md
+            analisis-congestion.md
       - uses: actions/upload-artifact@v7
         with:
           name: instantanea-trafico
