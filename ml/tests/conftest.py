@@ -20,5 +20,11 @@ def raw_traffic() -> pd.DataFrame:
             "carril_id": [1, 2, -1, 1, 1, 1],
             "ligeros": [100, 50, 80, 60, 20, 5],
             "pesados": [10, 5, 8, 6, None, 1],
+            "rango1_vehiculos": [0, 0, 8, 0, 0, 0],
+            "rango2_vehiculos": [10, 5, 80, 6, 20, 6],
+            "rango3_vehiculos": [100, 50, 0, 60, 0, 0],
+            "rango4_vehiculos": [0, 0, 0, 0, 0, 0],
+            "rango5_vehiculos": [0, 0, 0, 0, 0, 0],
+            "rango6_vehiculos": [0, 0, 0, 0, 0, 0],
         }
     )

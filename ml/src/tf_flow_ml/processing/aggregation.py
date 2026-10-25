@@ -5,7 +5,10 @@ from typing import Final
 import numpy as np
 import pandas as pd
 
-RAW_COLUMNS: Final = ("fecha", "estacion_id", "carril_id", "ligeros", "pesados")
+RANGE_COLUMNS: Final = tuple(f"rango{i}_vehiculos" for i in range(1, 7))
+"""Reparto de los vehículos de cada registro en seis rangos; suman ``ligeros + pesados``."""
+RAW_COLUMNS: Final = ("fecha", "estacion_id", "carril_id", "ligeros", "pesados", *RANGE_COLUMNS)
+BIN_COLUMNS: Final = [f"range_{i}" for i in range(1, 7)]
 GROUP_KEYS: Final = ["timestamp", "station_id", "direction"]
 
 
@@ -30,8 +33,9 @@ def aggregate_hourly(raw: pd.DataFrame) -> pd.DataFrame:
     df["direction"] = np.sign(df["carril_id"].astype(int))
     df["vehicles"] = df["ligeros"].fillna(0) + df["pesados"].fillna(0)
     df["heavy"] = df["pesados"].fillna(0)
+    df[BIN_COLUMNS] = df[list(RANGE_COLUMNS)].fillna(0).to_numpy()
 
-    hourly = df.groupby(GROUP_KEYS, as_index=False)[["vehicles", "heavy"]].sum()
+    hourly = df.groupby(GROUP_KEYS, as_index=False)[["vehicles", "heavy", *BIN_COLUMNS]].sum()
     return add_calendar_features(hourly)
 
 

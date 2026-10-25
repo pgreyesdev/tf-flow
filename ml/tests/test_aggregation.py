@@ -39,3 +39,11 @@ def test_calendar_features_use_monday_as_zero(raw_traffic: pd.DataFrame) -> None
 def test_missing_columns_raise_a_clear_error(raw_traffic: pd.DataFrame) -> None:
     with pytest.raises(SchemaError, match="pesados"):
         aggregate_hourly(raw_traffic.drop(columns=["pesados"]))
+
+
+def test_range_bins_are_summed_per_direction(raw_traffic: pd.DataFrame) -> None:
+    hourly = aggregate_hourly(raw_traffic)
+
+    row = hourly[(hourly["timestamp"] == "2026-03-02 08:00") & (hourly["direction"] == 1)]
+    assert row[[f"range_{i}" for i in range(1, 7)]].to_numpy().tolist() == [[0, 15, 150, 0, 0, 0]]
+    assert (hourly[[f"range_{i}" for i in range(1, 7)]].sum(axis=1) == hourly["vehicles"]).all()
