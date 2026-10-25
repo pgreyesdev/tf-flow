@@ -1,7 +1,7 @@
 import pandas as pd
 import pytest
 
-from tf_flow_ml.processing.aggregation import SchemaError, aggregate_hourly
+from tf_flow_ml.processing.aggregation import BIN_COLUMNS, SchemaError, aggregate_hourly
 
 
 def test_lanes_of_the_same_direction_are_summed(raw_traffic: pd.DataFrame) -> None:
@@ -45,5 +45,5 @@ def test_range_bins_are_summed_per_direction(raw_traffic: pd.DataFrame) -> None:
     hourly = aggregate_hourly(raw_traffic)
 
     row = hourly[(hourly["timestamp"] == "2026-03-02 08:00") & (hourly["direction"] == 1)]
-    assert row[[f"range_{i}" for i in range(1, 7)]].to_numpy().tolist() == [[0, 15, 150, 0, 0, 0]]
-    assert (hourly[[f"range_{i}" for i in range(1, 7)]].sum(axis=1) == hourly["vehicles"]).all()
+    assert row[BIN_COLUMNS].to_numpy().tolist() == [[0, 15, 150, 0, 0, 0]]
+    assert (hourly[BIN_COLUMNS].sum(axis=1) == hourly["vehicles"]).all()

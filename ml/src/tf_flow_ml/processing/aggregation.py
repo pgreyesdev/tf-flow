@@ -6,9 +6,13 @@ import numpy as np
 import pandas as pd
 
 RANGE_COLUMNS: Final = tuple(f"rango{i}_vehiculos" for i in range(1, 7))
-"""Reparto de los vehículos de cada registro en seis rangos; suman ``ligeros + pesados``."""
+"""Vehículos por rango de velocidad; los seis suman ``ligeros + pesados``.
+
+Los límites en km/h no están publicados. Por el reparto entre carriles lentos y rápidos, el rango 1
+parece el más lento; pendiente de confirmar con el Cabildo.
+"""
 RAW_COLUMNS: Final = ("fecha", "estacion_id", "carril_id", "ligeros", "pesados", *RANGE_COLUMNS)
-BIN_COLUMNS: Final = [f"range_{i}" for i in range(1, 7)]
+BIN_COLUMNS: Final = [f"speed_bin_{i}" for i in range(1, 7)]
 GROUP_KEYS: Final = ["timestamp", "station_id", "direction"]
 
 
