@@ -1,0 +1,24 @@
+import pandas as pd
+import pytest
+
+
+@pytest.fixture
+def raw_traffic() -> pd.DataFrame:
+    """Muestra con la forma del fichero del Cabildo: un registro por carril y hora."""
+    return pd.DataFrame(
+        {
+            "fecha": [
+                "2026-03-02 08:00",
+                "2026-03-02 08:00",
+                "2026-03-02 08:00",
+                "2026-03-02 09:00",
+                "2026-03-07 08:00",
+                None,
+            ],
+            "estacion_id": [11, 11, 11, 11, 11, 11],
+            "estacion_nombre": ["AÑAZA"] * 6,
+            "carril_id": [1, 2, -1, 1, 1, 1],
+            "ligeros": [100, 50, 80, 60, 20, 5],
+            "pesados": [10, 5, 8, 6, None, 1],
+        }
+    )

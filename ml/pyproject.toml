@@ -1,0 +1,18 @@
+[project]
+name = "tf-flow-ml"
+version = "0.1.0"
+description = "Ingesta de datos, preprocesado y modelos de TF-FLOW."
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "httpx>=0.28",
+    "numpy>=2.1",
+    "pandas>=2.2",
+    "scikit-learn>=1.5",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/tf_flow_ml"]
