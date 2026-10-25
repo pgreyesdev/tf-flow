@@ -39,3 +39,4 @@ android/local.properties
 site/
 mlflow/
 mlflow.db
+models/

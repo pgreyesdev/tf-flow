@@ -34,6 +34,8 @@ FEATURES: Final = [
     *RECENT,
 ]
 RECENT_KEYS: Final = [*STATION_KEYS, "hour", "is_weekend"]
+DATE_DTYPE: Final = "datetime64[us]"
+"""Resolución común de fechas: pandas no cruza fechas con distinta resolución."""
 
 
 def recent_profile(
@@ -59,10 +61,10 @@ def recent_profile(
         .mean()
         .reset_index()
     )
-    rolled["date"] += pd.Timedelta(days=lag_days)
+    rolled["date"] = (rolled["date"] + pd.Timedelta(days=lag_days)).astype(DATE_DTYPE)
 
     query = target[RECENT_KEYS].assign(
-        date=target["timestamp"].dt.normalize(), row=np.arange(len(target))
+        date=target["timestamp"].dt.normalize().astype(DATE_DTYPE), row=np.arange(len(target))
     )
     merged = pd.merge_asof(
         query.sort_values("date"),

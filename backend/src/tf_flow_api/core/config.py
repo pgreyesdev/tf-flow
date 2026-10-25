@@ -2,6 +2,7 @@
 
 from enum import StrEnum
 from functools import lru_cache
+from pathlib import Path
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -19,6 +20,11 @@ class Settings(BaseSettings):
     environment: Environment = Environment.DEVELOPMENT
     log_level: str = "INFO"
     cors_origins: list[str] = Field(default_factory=lambda: ["http://localhost:3000"])
+    model_path: Path | None = None
+    """Paquete del modelo generado por el flujo de entrenamiento (``serving.joblib``)."""
+    model_sha256: str | None = Field(default=None, pattern=r"^[0-9a-fA-F]{64}$")
+    """Huella esperada del paquete; sin ella no se carga."""
+    max_forecast_days: int = Field(default=14, ge=1, le=60)
 
     @property
     def docs_enabled(self) -> bool:

@@ -1402,6 +1402,7 @@ dependencies = [
     { name = "fastapi" },
     { name = "pydantic" },
     { name = "pydantic-settings" },
+    { name = "tf-flow-ml" },
     { name = "uvicorn", extra = ["standard"] },
 ]
 
@@ -1410,6 +1411,7 @@ requires-dist = [
     { name = "fastapi", specifier = ">=0.115" },
     { name = "pydantic", specifier = ">=2.9" },
     { name = "pydantic-settings", specifier = ">=2.6" },
+    { name = "tf-flow-ml", editable = "ml" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.32" },
 ]
 

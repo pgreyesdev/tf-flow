@@ -10,7 +10,13 @@ class HealthStatus(BaseModel):
     status: str
     version: str
     environment: str
+    model_loaded: bool
 
 
-def get_health(settings: Settings) -> HealthStatus:
-    return HealthStatus(status="ok", version=__version__, environment=settings.environment)
+def get_health(settings: Settings, model_loaded: bool) -> HealthStatus:
+    return HealthStatus(
+        status="ok",
+        version=__version__,
+        environment=settings.environment,
+        model_loaded=model_loaded,
+    )

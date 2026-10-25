@@ -9,7 +9,11 @@ COPY ml ./ml
 RUN uv sync --frozen --no-dev --package tf-flow-api
 
 FROM python:3.12-slim
-RUN useradd --create-home --uid 10001 app
+# LightGBM necesita la biblioteca de OpenMP en tiempo de ejecución.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends libgomp1 \
+    && rm -rf /var/lib/apt/lists/* \
+    && useradd --create-home --uid 10001 app
 WORKDIR /app
 COPY --from=builder --chown=app:app /app /app
 ENV PATH="/app/.venv/bin:$PATH" PYTHONUNBUFFERED=1
