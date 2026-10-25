@@ -11,6 +11,8 @@ Eliges carretera, sentido, día y hora, y TF-FLOW te dice cuántos vehículos se
 de atasco y a qué hora te conviene salir. Disponible como web, app Android y asistente
 conversacional.
 
+**Web:** [tf-flow.vercel.app](https://tf-flow.vercel.app) · **API:** [tf-flow.fly.dev](https://tf-flow.fly.dev/api/v1/health)
+
 ## Estructura
 
 | Carpeta | Contenido |
