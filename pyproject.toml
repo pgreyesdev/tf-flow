@@ -1,0 +1,73 @@
+[project]
+name = "tf-flow"
+version = "0.1.0"
+description = "Monorepo de TF-FLOW: predicción de congestión en las carreteras de Tenerife."
+requires-python = ">=3.12,<3.13"
+dependencies = []
+
+[tool.uv]
+package = false
+
+[tool.uv.workspace]
+members = ["backend", "ml"]
+
+[tool.uv.sources]
+tf-flow-api = { workspace = true }
+tf-flow-ml = { workspace = true }
+
+[dependency-groups]
+dev = [
+    "tf-flow-api",
+    "tf-flow-ml",
+    "mypy>=1.13",
+    "pandas-stubs>=2.2",
+    "pre-commit>=4.0",
+    "pytest>=8.3",
+    "pytest-cov>=6.0",
+    "respx>=0.21",
+    "ruff>=0.8",
+]
+docs = [
+    "mkdocs-material>=9.5",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "N", "UP", "B", "S", "SIM", "RUF", "PL", "PTH", "TID"]
+ignore = ["PLR0913"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["tf_flow_api", "tf_flow_ml"]
+
+[tool.ruff.lint.per-file-ignores]
+"**/tests/**" = ["S101", "PLR2004"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+plugins = ["pydantic.mypy"]
+mypy_path = ["backend/src", "ml/src"]
+packages = ["tf_flow_api", "tf_flow_ml"]
+
+[[tool.mypy.overrides]]
+module = ["sklearn.*"]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["backend/tests", "ml/tests"]
+addopts = "--strict-markers --import-mode=importlib"
+filterwarnings = [
+    "error",
+    "ignore:Using `httpx` with `starlette.testclient` is deprecated",
+]
+
+[tool.coverage.run]
+source = ["tf_flow_api", "tf_flow_ml"]
+branch = true
+
+[tool.coverage.report]
+fail_under = 90
+show_missing = true

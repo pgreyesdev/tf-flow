@@ -1,0 +1,39 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+# Datos y modelos generados (se descargan o se entrenan, no se versionan)
+data/
+artifacts/
+mlruns/
+
+# Node
+node_modules/
+.next/
+dist/
+
+# Android
+android/**/build/
+android/.gradle/
+android/local.properties
+
+# Entorno y secretos
+.env
+.env.*
+!.env.example
+
+# Editores y sistema
+.idea/
+.vscode/*
+!.vscode/extensions.json
+.DS_Store
+
+# Documentación generada
+site/
