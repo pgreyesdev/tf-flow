@@ -1,0 +1,57 @@
+name: Entrenamiento
+
+# Entrena y compara los modelos con la instantánea más reciente del portal del Cabildo. El informe
+# sale en el resumen de la ejecución y los modelos quedan como artefacto.
+on:
+  workflow_dispatch:
+    inputs:
+      test_from:
+        description: "Primera fecha del periodo de test"
+        required: true
+        default: "2025-01-01"
+      n_estimators:
+        description: "Árboles de LightGBM (Random Forest usa la mitad)"
+        required: true
+        default: "300"
+
+permissions:
+  contents: read
+
+jobs:
+  train:
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+      - run: uv sync --frozen --python 3.12
+      - id: day
+        run: echo "stamp=$(date -u +%Y%m%d)" >> "$GITHUB_OUTPUT"
+      - name: Reutilizar la última instantánea
+        uses: actions/cache@v4
+        with:
+          path: data/raw/traffic
+          key: traffic-2019-2026-${{ steps.day.outputs.stamp }}
+          restore-keys: traffic-2019-2026-
+      - name: Descargar instantánea si no hay ninguna
+        run: |
+          if ! ls -d data/raw/traffic/*/ > /dev/null 2>&1; then
+            uv run python -m tf_flow_ml.ingestion traffic --years 2019-2026 --out data/raw
+          fi
+      - name: Entrenar y evaluar
+        env:
+          TEST_FROM: ${{ inputs.test_from }}
+          N_ESTIMATORS: ${{ inputs.n_estimators }}
+        run: |
+          snapshot=$(ls -d data/raw/traffic/*/ | tail -n 1)
+          uv run python -m tf_flow_ml.training "$snapshot" --out artifacts \
+            --test-from "$TEST_FROM" --n-estimators "$N_ESTIMATORS"
+          cat artifacts/entrenamiento.md >> "$GITHUB_STEP_SUMMARY"
+          cat artifacts/entrenamiento.md
+      - uses: actions/upload-artifact@v7
+        with:
+          name: modelos
+          path: artifacts
+          retention-days: 30

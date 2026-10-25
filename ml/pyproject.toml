@@ -4,7 +4,10 @@ version = "0.1.0"
 description = "Ingesta de datos, preprocesado y modelos de TF-FLOW."
 requires-python = ">=3.12,<3.13"
 dependencies = [
+    "holidays>=0.107",
     "httpx>=0.28",
+    "joblib>=1.6.0",
+    "lightgbm>=4.7.0",
     "numpy>=2.1",
     "pandas>=2.2",
     "pyarrow>=18.0",

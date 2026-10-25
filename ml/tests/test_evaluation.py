@@ -3,7 +3,7 @@ import math
 import pandas as pd
 import pytest
 
-from tf_flow_ml.evaluation.metrics import regression_report
+from tf_flow_ml.evaluation.metrics import classification_report, regression_report
 from tf_flow_ml.evaluation.split import temporal_split
 
 
@@ -33,3 +33,15 @@ def test_regression_report() -> None:
 
 def test_wape_is_nan_when_there_is_no_traffic() -> None:
     assert math.isnan(regression_report([0, 0], [1, 1]).wape)
+
+
+def test_classification_report_focuses_on_heavy_congestion() -> None:
+    truth = ["low", "low", "high", "high", "medium"]
+    pred = ["low", "high", "high", "low", "medium"]
+
+    report = classification_report(truth, pred)
+
+    assert report.precision_high == pytest.approx(0.5)
+    assert report.recall_high == pytest.approx(0.5)
+    assert report.balanced_accuracy == pytest.approx((0.5 + 0.5 + 1) / 3)
+    assert 0 < report.macro_f1 < 1

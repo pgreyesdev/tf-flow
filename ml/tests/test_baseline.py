@@ -1,7 +1,11 @@
 import pandas as pd
 import pytest
 
-from tf_flow_ml.models.baseline import HistoricalMeanBaseline, NotFittedError
+from tf_flow_ml.models.baseline import (
+    HistoricalMeanBaseline,
+    HistoricalModeBaseline,
+    NotFittedError,
+)
 
 
 @pytest.fixture
@@ -43,3 +47,27 @@ def test_predict_before_fit_fails() -> None:
 
     with pytest.raises(NotFittedError):
         HistoricalMeanBaseline().predict(query)
+
+
+def test_mode_baseline_predicts_the_most_frequent_level() -> None:
+    history = pd.DataFrame(
+        {
+            "station_id": [1, 1, 1, 1, 2],
+            "direction": [1, 1, 1, 1, 1],
+            "day_of_week": [0, 0, 0, 1, 0],
+            "hour": [8, 8, 8, 8, 3],
+            "level": ["high", "high", "low", "low", "low"],
+        }
+    )
+    query = pd.DataFrame(
+        {
+            "station_id": [1, 1, 9],
+            "direction": [1, 1, 1],
+            "day_of_week": [0, 6, 0],
+            "hour": [8, 8, 8],
+        }
+    )
+
+    model = HistoricalModeBaseline().fit(history)
+
+    assert model.predict(query).tolist() == ["high", "high", "low"]

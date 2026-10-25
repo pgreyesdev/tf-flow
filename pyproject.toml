@@ -54,7 +54,7 @@ mypy_path = ["backend/src", "ml/src"]
 packages = ["tf_flow_api", "tf_flow_ml"]
 
 [[tool.mypy.overrides]]
-module = ["sklearn.*", "pyarrow.*"]
+module = ["sklearn.*", "pyarrow.*", "lightgbm.*", "joblib.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]
@@ -72,4 +72,4 @@ branch = true
 [tool.coverage.report]
 fail_under = 90
 show_missing = true
-exclude_also = ["if __name__ == .__main__.:"]
+exclude_also = ["if __name__ == .__main__.:", "@abstractmethod"]
