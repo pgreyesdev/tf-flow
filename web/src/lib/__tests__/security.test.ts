@@ -21,6 +21,10 @@ describe("content security policy", () => {
     );
   });
 
+  it("lets the map run its workers from the site or a blob", () => {
+    expect(contentSecurityPolicy("abc", false)).toContain("worker-src 'self' blob:");
+  });
+
   it("allows eval only in development", () => {
     const policy = contentSecurityPolicy("abc", true);
     expect(policy).toContain("'unsafe-eval'");

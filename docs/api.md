@@ -8,6 +8,7 @@ La API sirve las previsiones del modelo final. Todas las rutas cuelgan de `/api/
 | `GET /health` | Estado del servicio y si el modelo está cargado |
 | `GET /stations` | Estaciones y sentidos con previsión |
 | `GET /stations/{id}/forecast?direction=1&date=AAAA-MM-DD` | Previsión hora a hora de un día |
+| `GET /network/now` | Previsión de la hora actual en las estaciones con coordenadas, para el mapa |
 | `GET /model` | Último dato con el que se entrenó, umbral de aviso y métricas en test |
 | `POST /assistant/chat` | Respuesta del asistente conversacional ([ADR 0009](adr/0009-asistente-openai.md)) |
 

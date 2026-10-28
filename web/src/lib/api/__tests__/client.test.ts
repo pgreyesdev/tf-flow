@@ -3,6 +3,7 @@ import {
   askAssistant,
   getDayForecast,
   getModelInfo,
+  getNetworkNow,
   getStations,
 } from "@/lib/api/client";
 import { getHomeData } from "@/lib/api/featured";
@@ -55,6 +56,17 @@ describe("API client", () => {
   it("returns the model info", async () => {
     mockFetch(() => json(MODEL));
     await expect(getModelInfo()).resolves.toEqual(MODEL);
+  });
+
+  it("reads the whole network at the current hour, with coordinates", async () => {
+    const station = { ...STATIONS[0]!, latitude: 28.448319, longitude: -16.27364 };
+    const network = {
+      time: "2026-10-28T08:00:00",
+      stations: [{ station, hour: dayForecast().hours[8] }],
+    };
+    const fetchMock = mockFetch(() => json(network));
+    await expect(getNetworkNow()).resolves.toEqual(network);
+    expect(String(fetchMock.mock.calls[0]![0])).toBe("http://api.test/api/v1/network/now");
   });
 
   it.each([

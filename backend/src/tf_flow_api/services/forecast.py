@@ -24,6 +24,7 @@ from tf_flow_api.domain.forecast import (
     Station,
     StationNow,
 )
+from tf_flow_ml.serving.predictor import HourlyForecast as PredictedHour
 from tf_flow_ml.serving.predictor import Predictor
 
 
@@ -80,6 +81,16 @@ def _station(row: Mapping[Hashable, Any]) -> Station:
     )
 
 
+def _hourly(forecast: PredictedHour) -> HourlyForecast:
+    return HourlyForecast(
+        time=forecast.timestamp.to_pydatetime(),
+        vehicles=forecast.vehicles,
+        level=Level(forecast.level),
+        probability_high=forecast.probability_high,
+        factors=[Factor(**asdict(factor)) for factor in forecast.factors],
+    )
+
+
 def today_in_tenerife() -> dt.date:
     return dt.datetime.now(ZoneInfo(TIMEZONE)).date()
 
@@ -119,16 +130,27 @@ class ForecastService:
         return list(self._stations.values())
 
     def network_now(self, now: dt.datetime | None = None) -> NetworkNow:
-        """La previsión de la hora actual en todas las estaciones, para pintar el mapa."""
+        """La previsión de la hora actual en las estaciones situadas en el mapa.
+
+        Solo pide esa hora a cada estación: con las previsiones precalculadas es leerlas, y sin
+        ellas no merece la pena calcular la semana entera de toda la red.
+        """
         if now is None:
             current = dt.datetime.now(ZoneInfo(TIMEZONE)).hour
             now = dt.datetime.combine(self.today(), dt.time(current))
         moment = now.replace(minute=0, second=0, microsecond=0, tzinfo=None)
-        stations = []
-        for station in self._stations.values():
-            day = self.day_forecast(station.station_id, station.direction, moment.date())
-            hour = next(h for h in day.hours if h.time == moment)
-            stations.append(StationNow(station=station, hour=hour))
+        stations = [
+            StationNow(
+                station=station,
+                hour=_hourly(
+                    self.predictor.predict(
+                        station.station_id, station.direction, [pd.Timestamp(moment)]
+                    )[0]
+                ),
+            )
+            for station in self._stations.values()
+            if station.latitude is not None and station.longitude is not None
+        ]
         return NetworkNow(time=moment, stations=stations)
 
     def model_info(self) -> ModelInfo:
@@ -177,16 +199,7 @@ class ForecastService:
         data_until = self.predictor.bundle.data_until.to_pydatetime()
         result = []
         for i, day in enumerate(days):
-            forecasts = [
-                HourlyForecast(
-                    time=f.timestamp.to_pydatetime(),
-                    vehicles=f.vehicles,
-                    level=Level(f.level),
-                    probability_high=f.probability_high,
-                    factors=[Factor(**asdict(factor)) for factor in f.factors],
-                )
-                for f in predicted[i * HOURS_PER_DAY : (i + 1) * HOURS_PER_DAY]
-            ]
+            forecasts = [_hourly(f) for f in predicted[i * HOURS_PER_DAY : (i + 1) * HOURS_PER_DAY]]
             result.append(
                 DayForecast(
                     station=station,

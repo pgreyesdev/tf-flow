@@ -14,6 +14,8 @@ import {
   errorBodySchema,
   type ModelInfo,
   modelInfoSchema,
+  type NetworkNow,
+  networkNowSchema,
   type Station,
   stationSchema,
 } from "./schemas";
@@ -91,6 +93,11 @@ export function getStations(): Promise<Station[]> {
 
 export function getModelInfo(): Promise<ModelInfo> {
   return request("/api/v1/model", modelInfoSchema, cached, READ_TIMEOUT_MS);
+}
+
+/** La hora actual en toda la red, para el mapa. Lee las previsiones ya calculadas. */
+export function getNetworkNow(): Promise<NetworkNow> {
+  return request("/api/v1/network/now", networkNowSchema, cached, FORECAST_TIMEOUT_MS);
 }
 
 export function getDayForecast(

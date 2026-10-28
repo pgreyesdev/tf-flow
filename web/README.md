@@ -27,10 +27,11 @@ pnpm check        # ESLint, Prettier, tipos y tests
 | Carpeta           | Contenido                                                  |
 | ----------------- | ---------------------------------------------------------- |
 | `src/app/`        | Páginas: portada, `prediccion`, `asistente`, `metodologia` |
-| `src/components/` | Gráfica hora a hora, chat, tarjetas y elementos comunes    |
+| `src/components/` | Gráfica hora a hora, mapa 3D, chat, tarjetas y comunes     |
 | `src/lib/api/`    | Cliente de la API, solo de servidor, con validación Zod    |
 | `src/lib/`        | Formato en español, estaciones, CSP y límite de peticiones |
 | `src/proxy.ts`    | Genera el nonce de la CSP en cada petición                 |
+| `public/terrain/` | Relieve de Tenerife para el mapa (Terrain Tiles, AWS)      |
 
 ## Producción
 

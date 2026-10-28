@@ -35,6 +35,14 @@ nada que permita gastar el presupuesto del asistente o inyectar código.
   texto e icono. Contraste mínimo 4,5:1 sobre el tramo más claro del cielo, foco visible y respeto
   a `prefers-reduced-motion` (el cielo deja de moverse). La gráfica hora a hora es SVG sin
   dependencias y lleva una tabla con los mismos datos.
+- **Mapa 3D de la isla en la portada:** MapLibre GL, de código abierto y sin claves. El relieve
+  son teselas Terrarium de Terrain Tiles (AWS Open Data) recortadas a Tenerife, de zoom 6 a 11 y con
+  el fondo marino aplanado, servidas desde `public/terrain` (menos de 2 MB): ningún servicio externo
+  y nada que añadir a la CSP salvo `worker-src 'self' blob:` para los workers de MapLibre. Cada
+  estación es un punto con el color del nivel de la hora actual (si los dos sentidos difieren, el
+  peor) y su globo enlaza a la previsión del día. Las coordenadas vienen del catálogo de estaciones
+  del Cabildo. El mapa se carga solo en el navegador y, debajo, la misma información va en listas
+  con enlaces, para quien no use el mapa.
 - **Calidad:** ESLint con las reglas de Next.js y de accesibilidad, Prettier, Vitest con Testing
   Library (cobertura mínima del 90 %), `pnpm audit` y la imagen Docker escaneada con Trivy en el CI.
 

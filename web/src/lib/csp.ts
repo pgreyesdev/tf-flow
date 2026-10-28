@@ -13,6 +13,8 @@ export function contentSecurityPolicy(nonce: string, isDev: boolean): string {
     `style-src-attr 'unsafe-hashes' '${HIDDEN_SEGMENT_STYLE}'`,
     "img-src 'self' blob: data:",
     "font-src 'self'",
+    // El mapa dibuja el relieve en un worker que MapLibre crea desde un blob.
+    "worker-src 'self' blob:",
     "connect-src 'self'",
     "object-src 'none'",
     "base-uri 'self'",

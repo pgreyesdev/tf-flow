@@ -172,18 +172,21 @@ def test_a_week_in_one_go_matches_day_by_day(forecast: ForecastService) -> None:
     assert together == [forecast._compute_days(station, [day])[0] for day in days]
 
 
-def test_network_now_gives_every_station_at_the_current_hour(forecast: ForecastService) -> None:
+def test_network_now_gives_the_mapped_stations_at_the_current_hour(
+    forecast: ForecastService,
+) -> None:
     now = dt.datetime(2025, 6, 2, 8, 41, tzinfo=ZoneInfo("Atlantic/Canary"))
     network = forecast.network_now(now)
     assert network.time == dt.datetime(2025, 6, 2, 8)
-    assert [s.station.station_id for s in network.stations] == [1, 2]
-    expected = forecast.day_forecast(2, 1, TODAY).hours[8]
-    assert network.stations[1].hour == expected
+    # La estación 2 no tiene coordenadas en el catálogo: no se puede situar en el mapa.
+    assert [s.station.station_id for s in network.stations] == [1]
+    expected = forecast.day_forecast(1, 1, TODAY).hours[8]
+    assert network.stations[0].hour == expected
 
 
 def test_network_now_endpoint(client: TestClient) -> None:
     response = client.get("/api/v1/network/now")
     assert response.status_code == 200
     body = response.json()
-    assert len(body["stations"]) == 2
+    assert len(body["stations"]) == 1
     assert body["stations"][0]["station"]["latitude"] == 28.448319

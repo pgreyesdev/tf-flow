@@ -1,7 +1,9 @@
 import { ArrowRight, Brain, Database, MessageCircleQuestion, Sparkles } from "lucide-react";
 import Link from "next/link";
+import { Suspense } from "react";
 
 import { AppPromo } from "@/components/app-promo";
+import { NetworkMap, NetworkMapSkeleton } from "@/components/network-map";
 import { Sky } from "@/components/sky";
 import { TrafficWeather } from "@/components/traffic-weather";
 import { getHomeData } from "@/lib/api/featured";
@@ -91,6 +93,11 @@ export default async function HomePage() {
           )}
         </div>
       </section>
+
+      {/* El mapa llega después sin retrasar la previsión destacada. */}
+      <Suspense fallback={<NetworkMapSkeleton />}>
+        <NetworkMap />
+      </Suspense>
 
       <section aria-labelledby="how-title">
         <h2 id="how-title" className="font-display text-3xl font-extrabold sm:text-4xl">

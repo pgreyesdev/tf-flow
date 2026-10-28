@@ -17,6 +17,9 @@ export const stationSchema = z.object({
   direction: directionSchema,
   direction_label: z.string(),
   name: z.string(),
+  // Del catálogo de estaciones del Cabildo. Faltan en modelos antiguos o si no constan.
+  latitude: z.number().min(-90).max(90).nullish(),
+  longitude: z.number().min(-180).max(180).nullish(),
 });
 export type Station = z.infer<typeof stationSchema>;
 
@@ -45,6 +48,12 @@ export const dayForecastSchema = z.object({
   worst_hour: hourlyForecastSchema,
 });
 export type DayForecast = z.infer<typeof dayForecastSchema>;
+
+export const networkNowSchema = z.object({
+  time: localDateTime,
+  stations: z.array(z.object({ station: stationSchema, hour: hourlyForecastSchema })),
+});
+export type NetworkNow = z.infer<typeof networkNowSchema>;
 
 export const modelInfoSchema = z.object({
   data_until: localDateTime,
