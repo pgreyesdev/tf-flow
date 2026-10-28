@@ -36,6 +36,8 @@ export class ApiError extends Error {
 /** Las previsiones solo cambian cuando se publica un modelo nuevo: se reutilizan unos minutos. */
 const FORECAST_REVALIDATE_SECONDS = 600;
 const READ_TIMEOUT_MS = 10_000;
+/** La primera previsión de una estación calcula su semana entera y en Fly puede tardar más. */
+const FORECAST_TIMEOUT_MS = 25_000;
 const CHAT_TIMEOUT_MS = 75_000;
 
 const STATUS_KIND: Record<number, ApiErrorKind> = {
@@ -104,7 +106,7 @@ export function getDayForecast(
     `/api/v1/stations/${stationId}/forecast?${query.toString()}`,
     dayForecastSchema,
     cached,
-    READ_TIMEOUT_MS,
+    FORECAST_TIMEOUT_MS,
   );
 }
 

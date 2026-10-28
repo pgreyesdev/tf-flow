@@ -1,7 +1,9 @@
 """Casos de uso de previsión sobre el modelo empaquetado por ``tf_flow_ml``."""
 
 import datetime as dt
+import logging
 import re
+import time
 from collections import OrderedDict
 from collections.abc import Callable
 from dataclasses import asdict
@@ -69,6 +71,8 @@ def today_in_tenerife() -> dt.date:
     return dt.datetime.now(ZoneInfo(TIMEZONE)).date()
 
 
+logger = logging.getLogger(__name__)
+
 #: Días por estación y sentido que caben en caché: de sobra para toda la red y el rango servido.
 CACHE_SIZE = 4096
 #: Días que la web enseña a partir de hoy. Se calculan juntos cuando se pide uno que falta.
@@ -101,6 +105,21 @@ class ForecastService:
                 for row in catalogue.to_dict("records")
             )
         }
+
+    def warm_up(self) -> None:
+        """Calcula la semana de todas las estaciones para que ninguna visita espere al modelo.
+
+        Va estación a estación y suelta el turno entre una y otra, así que una petición que llega
+        mientras tanto solo espera, como mucho, a que termine la estación en curso.
+        """
+        started = time.monotonic()
+        for station in self.stations():
+            self.day_forecast(station.station_id, station.direction, None)
+        logger.info(
+            "Previsiones de %d estaciones listas en %.0f s",
+            len(self._stations),
+            time.monotonic() - started,
+        )
 
     def stations(self) -> list[Station]:
         return list(self._stations.values())

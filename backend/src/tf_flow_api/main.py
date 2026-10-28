@@ -3,6 +3,7 @@
 import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from threading import Thread
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -63,6 +64,10 @@ def create_app(
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         app.state.forecast = forecast or load_forecast_service(settings)
+        if forecast is None and app.state.forecast is not None:
+            # En segundo plano: la API responde desde el primer momento y, mientras, va dejando
+            # calculada la semana de cada estación.
+            Thread(target=app.state.forecast.warm_up, name="warm-up", daemon=True).start()
         app.state.assistant = assistant or build_assistant(settings, app.state.forecast)
         app.state.assistant_limiter = RateLimiter(settings.assistant_rate_limit_per_minute)
         yield

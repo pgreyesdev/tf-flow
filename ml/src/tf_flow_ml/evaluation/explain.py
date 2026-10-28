@@ -22,7 +22,15 @@ def shap_values(model: Any, features: pd.DataFrame, class_name: str | None = Non
     classes = list(model.classes_) if class_name is not None else []
     if class_name is not None and class_name not in classes:
         return pd.DataFrame(0.0, columns=features.columns, index=features.index)
-    contributions = np.asarray(model.predict(features, pred_contrib=True))
+    return _class_values(
+        np.asarray(model.predict(features, pred_contrib=True)), features, classes, class_name
+    )
+
+
+def _class_values(
+    contributions: np.ndarray, features: pd.DataFrame, classes: list[Any], class_name: str | None
+) -> pd.DataFrame:
+    """Extrae de la salida de ``pred_contrib`` las contribuciones de ``class_name``."""
     width = features.shape[1] + 1
     if len(classes) == BINARY:
         contributions = contributions if classes.index(class_name) == 1 else -contributions
@@ -40,13 +48,17 @@ def shap_log_odds(
     En multiclase la puntuación de una clase sola no es una probabilidad: puede subir la de atasco
     fuerte solo porque baja la de las otras. La diferencia con la clase de referencia sí es exacta y
     aditiva, y responde a «¿qué empuja hacia el atasco fuerte en vez de hacia el tráfico fluido?».
+    TreeSHAP es lo más caro de una previsión, así que se calcula una vez para las dos clases.
     """
     classes = list(model.classes_)
     if positive not in classes or reference not in classes:
         return pd.DataFrame(0.0, columns=features.columns, index=features.index)
+    contributions = np.asarray(model.predict(features, pred_contrib=True))
     if len(classes) == BINARY:
-        return shap_values(model, features, positive)
-    return shap_values(model, features, positive) - shap_values(model, features, reference)
+        return _class_values(contributions, features, classes, positive)
+    return _class_values(contributions, features, classes, positive) - _class_values(
+        contributions, features, classes, reference
+    )
 
 
 def shap_importance(
