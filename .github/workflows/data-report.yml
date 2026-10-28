@@ -26,7 +26,7 @@ jobs:
       - id: day
         run: echo "stamp=$(date -u +%Y%m%d)" >> "$GITHUB_OUTPUT"
       - name: Reutilizar la instantánea de hoy
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: data/raw/traffic
           key: traffic-${{ inputs.years }}-${{ steps.day.outputs.stamp }}
