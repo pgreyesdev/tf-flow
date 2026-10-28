@@ -30,7 +30,7 @@ jobs:
       - id: day
         run: echo "stamp=$(date -u +%Y%m%d)" >> "$GITHUB_OUTPUT"
       - name: Reutilizar la última instantánea
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: data/raw/traffic
           key: traffic-2019-2026-${{ steps.day.outputs.stamp }}
@@ -43,7 +43,7 @@ jobs:
       - name: Descargar el catálogo de estaciones
         run: uv run python -m tf_flow_ml.ingestion stations --out data/raw
       - name: Recuperar el historial de MLflow
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: mlflow
           key: mlflow-${{ github.run_id }}
