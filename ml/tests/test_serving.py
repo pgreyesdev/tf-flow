@@ -1,9 +1,11 @@
 from pathlib import Path
 
 import joblib
+import numpy as np
 import pandas as pd
 import pytest
 
+from tf_flow_ml.processing.aggregation import add_calendar_features
 from tf_flow_ml.serving.bundle import (
     IntegrityError,
     ServingBundle,
@@ -74,3 +76,27 @@ def test_every_feature_has_a_label() -> None:
 def test_unknown_station(bundle: ServingBundle) -> None:
     with pytest.raises(UnknownStationError):
         Predictor(bundle).predict(99, 1, [pd.Timestamp("2025-06-02 08:00")])
+
+
+def test_station_history_gives_the_same_features_as_the_whole_network(
+    bundle: ServingBundle,
+) -> None:
+    station = bundle.stations.iloc[0]
+    station_id, direction = int(station["station_id"]), int(station["direction"])
+    frame = add_calendar_features(
+        pd.DataFrame(
+            {
+                "timestamp": pd.date_range("2025-04-02", periods=24, freq="h"),
+                "station_id": station_id,
+                "direction": direction,
+            }
+        )
+    )
+    whole = bundle.features.transform(frame, history=bundle.history)
+    own = bundle.history[
+        (bundle.history["station_id"] == station_id) & (bundle.history["direction"] == direction)
+    ]
+    pd.testing.assert_frame_equal(bundle.features.transform(frame, history=own), whole)
+    forecast = Predictor(bundle).predict(station_id, direction, list(frame["timestamp"]))
+    expected = np.clip(bundle.volume_model.predict(whole), 0, None)
+    assert [h.vehicles for h in forecast] == pytest.approx(list(expected), abs=0.05)

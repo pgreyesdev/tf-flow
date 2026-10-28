@@ -1,7 +1,7 @@
 """Predicción de volumen y nivel de congestión para una estación, con sus motivos."""
 
 from dataclasses import dataclass
-from typing import Final
+from typing import Final, cast
 
 import numpy as np
 import pandas as pd
@@ -56,6 +56,12 @@ class Predictor:
         self.bundle = bundle
         self.top_factors = top_factors
         self._known = set(bundle.stations[["station_id", "direction"]].itertuples(index=False))
+        # Las variables recientes solo miran la historia de la propia estación y sentido. Separarla
+        # una vez evita recorrer la red entera en cada petición, que es lo que más tarda.
+        self._history: dict[tuple[int, int], pd.DataFrame] = {
+            cast(tuple[int, int], key): rows
+            for key, rows in bundle.history.groupby(["station_id", "direction"], observed=True)
+        }
 
     def predict(
         self, station_id: int, direction: int, timestamps: list[pd.Timestamp]
@@ -71,7 +77,8 @@ class Predictor:
                 }
             )
         )
-        x = self.bundle.features.transform(frame, history=self.bundle.history)
+        history = self._history.get((station_id, direction), self.bundle.history.iloc[:0])
+        x = self.bundle.features.transform(frame, history=history)
         vehicles = np.clip(self.bundle.volume_model.predict(x), 0, None)
         model = self.bundle.level_model
         levels = predict_with_threshold(model, x, self.bundle.high_threshold)
