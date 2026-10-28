@@ -5,6 +5,7 @@ Uso: ``uv run python -m tf_flow_ml.training data/raw/traffic/AAAAMMDD --out arti
 
 import argparse
 import logging
+import time
 from pathlib import Path
 from typing import cast
 
@@ -14,6 +15,7 @@ from tf_flow_ml.evaluation.metrics import ClassificationReport, RegressionReport
 from tf_flow_ml.ingestion.snapshot import load_snapshot
 from tf_flow_ml.processing.aggregation import aggregate_hourly
 from tf_flow_ml.serving.bundle import build_bundle, save_bundle
+from tf_flow_ml.serving.predictor import precompute_forecasts
 from tf_flow_ml.training.pipeline import TrainingConfig, TrainingResult, train_and_evaluate
 from tf_flow_ml.training.report import render_report
 
@@ -85,6 +87,13 @@ def main(argv: list[str] | None = None) -> None:
     if args.serving_bundle:
         metrics = _serving_metrics(result)
         bundle = build_bundle(result.data, names, config, result.high_threshold, metrics)
+        started = time.monotonic()
+        bundle.forecasts = precompute_forecasts(bundle)
+        logger.info(
+            "%s horas de previsión precalculadas en %.0f s",
+            f"{len(bundle.forecasts):,}",
+            time.monotonic() - started,
+        )
         digest = save_bundle(bundle, args.serving_bundle)
         logger.info("Paquete para la API en %s (sha256 %s)", args.serving_bundle, digest)
     if args.mlflow_uri:

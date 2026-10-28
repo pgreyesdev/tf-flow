@@ -52,6 +52,12 @@ carga al arrancar desde `TFFLOW_MODEL_PATH` y solo si su SHA-256 coincide con
 Sin modelo configurado la API arranca igualmente, `/health` indica `model_loaded: false` y las
 previsiones responden 503.
 
+El paquete trae además las previsiones de todas las estaciones para los 365 días que siguen al
+último dato, con sus motivos, calculadas al entrenar. Explicar cada hora con SHAP es lo que más
+CPU cuesta y la máquina de Fly es compartida: así el servidor solo lee el resultado y responde en
+milisegundos. Las horas que falten, por ejemplo con un paquete antiguo, se calculan al momento y
+quedan en memoria.
+
 ```bash
 mkdir -p models && cp ~/Descargas/modelos/artifacts/serving.joblib* models/
 export TFFLOW_MODEL_PATH=models/serving.joblib

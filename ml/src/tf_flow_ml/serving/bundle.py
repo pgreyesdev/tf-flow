@@ -1,9 +1,10 @@
 """Paquete con todo lo que la API necesita para predecir.
 
 Contiene los modelos LightGBM entrenados con todo el histórico, el constructor de variables, el
-umbral de aviso de atasco fuerte, las últimas semanas de tráfico (para las variables recientes) y
-el catálogo de estaciones. Se guarda con joblib, que usa pickle: cargar un fichero de origen
-desconocido puede ejecutar código, así que ``load_bundle`` comprueba antes su SHA-256.
+umbral de aviso de atasco fuerte, las últimas semanas de tráfico (para las variables recientes),
+el catálogo de estaciones y las previsiones de los próximos meses ya calculadas. Se guarda con
+joblib, que usa pickle: cargar un fichero de origen desconocido puede ejecutar código, así que
+``load_bundle`` comprueba antes su SHA-256.
 """
 
 import hashlib
@@ -40,6 +41,9 @@ class ServingBundle:
     """Una fila por estación y sentido: ``station_id``, ``direction``, ``name``."""
     data_until: pd.Timestamp
     metrics: dict[str, float]
+    forecasts: pd.DataFrame | None = None
+    """Previsiones ya calculadas de cada estación para los próximos meses, con sus motivos. La API
+    las sirve tal cual y solo usa los modelos para las horas que falten."""
 
 
 def build_bundle(

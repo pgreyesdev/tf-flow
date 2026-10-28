@@ -1,3 +1,4 @@
+from dataclasses import fields
 from pathlib import Path
 
 import joblib
@@ -14,7 +15,12 @@ from tf_flow_ml.serving.bundle import (
     load_bundle,
     save_bundle,
 )
-from tf_flow_ml.serving.predictor import FEATURE_LABELS, Predictor, UnknownStationError
+from tf_flow_ml.serving.predictor import (
+    FEATURE_LABELS,
+    Predictor,
+    UnknownStationError,
+    precompute_forecasts,
+)
 from tf_flow_ml.training.features import FEATURES
 from tf_flow_ml.training.pipeline import TrainingConfig, train_and_evaluate
 
@@ -100,3 +106,36 @@ def test_station_history_gives_the_same_features_as_the_whole_network(
     forecast = Predictor(bundle).predict(station_id, direction, list(frame["timestamp"]))
     expected = np.clip(bundle.volume_model.predict(whole), 0, None)
     assert [h.vehicles for h in forecast] == pytest.approx(list(expected), abs=0.05)
+
+
+def test_precomputed_forecasts_match_the_models(
+    bundle: ServingBundle, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    table = precompute_forecasts(bundle, days=3)
+    assert len(table) == len(bundle.stations) * 3 * 24
+    with_table = ServingBundle(**{**asdict_shallow(bundle), "forecasts": table})
+    station_id, direction = (int(v) for v in bundle.stations.iloc[0][["station_id", "direction"]])
+    hours = list(
+        pd.date_range(bundle.data_until.normalize() + pd.Timedelta(days=2), periods=24, freq="h")
+    )
+    expected = Predictor(bundle).compute(station_id, direction, hours)
+
+    predictor = Predictor(with_table)
+    monkeypatch.setattr(predictor, "compute", lambda *args: pytest.fail("debería leer la tabla"))
+    assert predictor.predict(station_id, direction, hours) == expected
+
+
+def test_hours_beyond_the_table_are_computed(bundle: ServingBundle) -> None:
+    table = precompute_forecasts(bundle, days=1)
+    predictor = Predictor(ServingBundle(**{**asdict_shallow(bundle), "forecasts": table}))
+    station_id, direction = (int(v) for v in bundle.stations.iloc[0][["station_id", "direction"]])
+    later = list(
+        pd.date_range(bundle.data_until.normalize() + pd.Timedelta(days=5), periods=24, freq="h")
+    )
+    assert predictor.predict(station_id, direction, later) == Predictor(bundle).compute(
+        station_id, direction, later
+    )
+
+
+def asdict_shallow(bundle: ServingBundle) -> dict[str, object]:
+    return {field.name: getattr(bundle, field.name) for field in fields(bundle)}

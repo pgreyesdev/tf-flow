@@ -3,7 +3,6 @@
 import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from threading import Thread
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -31,7 +30,12 @@ def load_forecast_service(settings: Settings) -> ForecastService | None:
     if settings.model_sha256 is None:
         raise RuntimeError("Define TFFLOW_MODEL_SHA256 para cargar el modelo")
     bundle = load_bundle(settings.model_path, settings.model_sha256)
-    logger.info("Modelo cargado con datos hasta %s", bundle.data_until)
+    precomputed = getattr(bundle, "forecasts", None)
+    logger.info(
+        "Modelo cargado con datos hasta %s y %s horas de previsión precalculadas",
+        bundle.data_until,
+        0 if precomputed is None else f"{len(precomputed):,}",
+    )
     return ForecastService(Predictor(bundle), settings.max_forecast_days)
 
 
@@ -64,10 +68,6 @@ def create_app(
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         app.state.forecast = forecast or load_forecast_service(settings)
-        if forecast is None and app.state.forecast is not None:
-            # En segundo plano: la API responde desde el primer momento y, mientras, va dejando
-            # calculada la semana de cada estación.
-            Thread(target=app.state.forecast.warm_up, name="warm-up", daemon=True).start()
         app.state.assistant = assistant or build_assistant(settings, app.state.forecast)
         app.state.assistant_limiter = RateLimiter(settings.assistant_rate_limit_per_minute)
         yield

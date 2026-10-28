@@ -161,19 +161,3 @@ def test_a_week_in_one_go_matches_day_by_day(forecast: ForecastService) -> None:
     days = [TODAY + dt.timedelta(days=i) for i in range(3)]
     together = forecast._compute_days(station, days)
     assert together == [forecast._compute_days(station, [day])[0] for day in days]
-
-
-def test_warm_up_leaves_every_station_ready(
-    forecast: ForecastService, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    forecast.warm_up()
-
-    def fail(*args: object) -> None:
-        raise AssertionError("ya debería estar calculado")
-
-    monkeypatch.setattr(forecast.predictor, "predict", fail)
-    for station in forecast.stations():
-        for days in range(7):
-            forecast.day_forecast(
-                station.station_id, station.direction, TODAY + dt.timedelta(days=days)
-            )

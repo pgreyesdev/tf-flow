@@ -1,7 +1,7 @@
 """Predicción de volumen y nivel de congestión para una estación, con sus motivos."""
 
 from dataclasses import dataclass
-from typing import Final, cast
+from typing import Any, Final, cast
 
 import numpy as np
 import pandas as pd
@@ -30,6 +30,12 @@ FEATURE_LABELS: Final = {
 """Nombre legible de cada variable, para explicar las predicciones en la web, la app y el chat."""
 
 
+MAX_FACTORS: Final = 3
+"""Motivos que se guardan por hora en las previsiones precalculadas."""
+PRECOMPUTED_DAYS: Final = 365
+"""Días tras el último dato que se dejan calculados al entrenar: de sobra hasta el siguiente."""
+
+
 class UnknownStationError(LookupError):
     pass
 
@@ -52,7 +58,7 @@ class HourlyForecast:
 
 
 class Predictor:
-    def __init__(self, bundle: ServingBundle, top_factors: int = 3) -> None:
+    def __init__(self, bundle: ServingBundle, top_factors: int = MAX_FACTORS) -> None:
         self.bundle = bundle
         self.top_factors = top_factors
         self._known = set(bundle.stations[["station_id", "direction"]].itertuples(index=False))
@@ -62,12 +68,34 @@ class Predictor:
             cast(tuple[int, int], key): rows
             for key, rows in bundle.history.groupby(["station_id", "direction"], observed=True)
         }
+        # Paquetes anteriores a las previsiones precalculadas no tienen el campo.
+        table = getattr(bundle, "forecasts", None)
+        self._precomputed: dict[tuple[int, int], pd.DataFrame] = (
+            {}
+            if table is None
+            else {
+                cast(tuple[int, int], key): rows.set_index("timestamp")
+                for key, rows in table.groupby(["station_id", "direction"], observed=True)
+            }
+        )
 
     def predict(
         self, station_id: int, direction: int, timestamps: list[pd.Timestamp]
     ) -> list[HourlyForecast]:
+        """Previsión de cada hora: la precalculada al entrenar si la hay, si no la calcula."""
         if (station_id, direction) not in self._known:
             raise UnknownStationError(f"No hay datos de la estación {station_id}/{direction}")
+        stored = self._precomputed.get((station_id, direction))
+        if stored is not None:
+            rows = stored.reindex(pd.DatetimeIndex(timestamps).floor("h"))
+            if not rows["vehicles"].isna().any():
+                return [_from_row(row) for row in rows.itertuples()]
+        return self.compute(station_id, direction, timestamps)
+
+    def compute(
+        self, station_id: int, direction: int, timestamps: list[pd.Timestamp]
+    ) -> list[HourlyForecast]:
+        """Pasa las horas por los modelos y explica cada una con SHAP. Es lo caro."""
         frame = add_calendar_features(
             pd.DataFrame(
                 {
@@ -85,12 +113,14 @@ class Predictor:
         probability = predict_high_probability(model, x)
         contributions = shap_log_odds(model, x, Level.HIGH, Level.LOW)
 
+        values = contributions.to_numpy()
+        names = contributions.columns.to_numpy()
+        top = np.argsort(-np.abs(values), axis=1, kind="stable")[:, : self.top_factors]
         forecasts = []
         for i, timestamp in enumerate(frame["timestamp"]):
-            row = contributions.iloc[i].sort_values(key=np.abs, ascending=False)
             factors = tuple(
-                Factor(str(name), FEATURE_LABELS[str(name)], round(float(value), 4))
-                for name, value in row.head(self.top_factors).items()
+                Factor(str(names[j]), FEATURE_LABELS[str(names[j])], round(float(values[i, j]), 4))
+                for j in top[i]
             )
             forecasts.append(
                 HourlyForecast(
@@ -102,3 +132,67 @@ class Predictor:
                 )
             )
         return forecasts
+
+
+def _from_row(row: Any) -> HourlyForecast:
+    factors = tuple(
+        Factor(str(name), FEATURE_LABELS[str(name)], round(float(value), 4))
+        for name, value in (
+            (getattr(row, f"factor_{i}"), getattr(row, f"contribution_{i}"))
+            for i in range(1, MAX_FACTORS + 1)
+        )
+        if isinstance(name, str)
+    )
+    return HourlyForecast(
+        timestamp=row.Index,
+        vehicles=round(float(row.vehicles), 1),
+        level=str(row.level),
+        probability_high=round(float(row.probability_high), 4),
+        factors=factors,
+    )
+
+
+def to_table(station_id: int, direction: int, forecasts: list[HourlyForecast]) -> pd.DataFrame:
+    """Previsiones en una tabla compacta, para guardarlas en el paquete."""
+    table = pd.DataFrame(
+        {
+            "station_id": station_id,
+            "direction": direction,
+            "timestamp": [f.timestamp for f in forecasts],
+            "vehicles": np.array([f.vehicles for f in forecasts], dtype="float32"),
+            "level": [f.level for f in forecasts],
+            "probability_high": np.array([f.probability_high for f in forecasts], dtype="float32"),
+        }
+    )
+    for i in range(MAX_FACTORS):
+        table[f"factor_{i + 1}"] = [
+            f.factors[i].feature if i < len(f.factors) else None for f in forecasts
+        ]
+        table[f"contribution_{i + 1}"] = np.array(
+            [f.factors[i].contribution if i < len(f.factors) else np.nan for f in forecasts],
+            dtype="float32",
+        )
+    return table
+
+
+def precompute_forecasts(bundle: ServingBundle, days: int = PRECOMPUTED_DAYS) -> pd.DataFrame:
+    """Calcula las previsiones de todas las estaciones para los ``days`` días que siguen al último
+    dato publicado.
+
+    Explicar cada hora con SHAP cuesta CPU; aquí se paga una vez, en la máquina que entrena, y el
+    servidor solo tiene que leer el resultado.
+    """
+    predictor = Predictor(bundle)
+    start = bundle.data_until.normalize() + pd.Timedelta(days=1)
+    hours = list(pd.date_range(start, periods=days * 24, freq="h"))
+    table = pd.concat(
+        [
+            to_table(station_id, direction, predictor.compute(station_id, direction, hours))
+            for station_id, direction in bundle.stations[["station_id", "direction"]].itertuples(
+                index=False
+            )
+        ],
+        ignore_index=True,
+    )
+    categories = ["level", *(f"factor_{i}" for i in range(1, MAX_FACTORS + 1))]
+    return table.astype(dict.fromkeys(categories, "category"))
