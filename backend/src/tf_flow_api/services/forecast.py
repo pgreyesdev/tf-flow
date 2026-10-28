@@ -1,11 +1,13 @@
 """Casos de uso de previsión sobre el modelo empaquetado por ``tf_flow_ml``."""
 
 import datetime as dt
+import math
 import re
 from collections import OrderedDict
-from collections.abc import Callable
+from collections.abc import Callable, Hashable, Mapping
 from dataclasses import asdict
 from threading import Lock
+from typing import Any
 from zoneinfo import ZoneInfo
 
 import pandas as pd
@@ -18,7 +20,9 @@ from tf_flow_api.domain.forecast import (
     HourlyForecast,
     Level,
     ModelInfo,
+    NetworkNow,
     Station,
+    StationNow,
 )
 from tf_flow_ml.serving.predictor import Predictor
 
@@ -56,12 +60,23 @@ def readable_name(raw: str) -> str:
     return " ".join(readable)
 
 
-def _station(station_id: int, direction: int, name: str) -> Station:
+def _coordinate(value: Any) -> float | None:
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return None
+    return None if math.isnan(number) else round(number, 6)
+
+
+def _station(row: Mapping[Hashable, Any]) -> Station:
+    direction = int(row["direction"])
     return Station(
-        station_id=station_id,
+        station_id=int(row["station_id"]),
         direction=direction,
         direction_label=DIRECTION_LABELS[direction],
-        name=readable_name(name),
+        name=readable_name(str(row["name"])),
+        latitude=_coordinate(row.get("latitude")),
+        longitude=_coordinate(row.get("longitude")),
     )
 
 
@@ -97,14 +112,24 @@ class ForecastService:
         catalogue = predictor.bundle.stations
         self._stations: dict[tuple[int, int], Station] = {
             (station.station_id, station.direction): station
-            for station in (
-                _station(int(row["station_id"]), int(row["direction"]), str(row["name"]))
-                for row in catalogue.to_dict("records")
-            )
+            for station in (_station(row) for row in catalogue.to_dict("records"))
         }
 
     def stations(self) -> list[Station]:
         return list(self._stations.values())
+
+    def network_now(self, now: dt.datetime | None = None) -> NetworkNow:
+        """La previsión de la hora actual en todas las estaciones, para pintar el mapa."""
+        if now is None:
+            current = dt.datetime.now(ZoneInfo(TIMEZONE)).hour
+            now = dt.datetime.combine(self.today(), dt.time(current))
+        moment = now.replace(minute=0, second=0, microsecond=0, tzinfo=None)
+        stations = []
+        for station in self._stations.values():
+            day = self.day_forecast(station.station_id, station.direction, moment.date())
+            hour = next(h for h in day.hours if h.time == moment)
+            stations.append(StationNow(station=station, hour=hour))
+        return NetworkNow(time=moment, stations=stations)
 
     def model_info(self) -> ModelInfo:
         bundle = self.predictor.bundle

@@ -14,6 +14,7 @@ from tf_flow_ml.serving.bundle import (
     file_sha256,
     load_bundle,
     save_bundle,
+    station_coordinates,
 )
 from tf_flow_ml.serving.predictor import (
     FEATURE_LABELS,
@@ -139,3 +140,32 @@ def test_hours_beyond_the_table_are_computed(bundle: ServingBundle) -> None:
 
 def asdict_shallow(bundle: ServingBundle) -> dict[str, object]:
     return {field.name: getattr(bundle, field.name) for field in fields(bundle)}
+
+
+def test_station_coordinates_from_the_catalogue() -> None:
+    catalogue = pd.DataFrame(
+        {
+            "estacion_id": [1, 1, 2, 3, 4],
+            "estacion_nombre": ["NORTE", "NORTE", "SUR", "ERRATA", "SIN DATOS"],
+            "estacion_latitud": [28.45, 28.46, 28.05, 40.4, None],
+            "estacion_longitud": [-16.27, -16.28, -16.71, -3.7, None],
+        }
+    )
+    coordinates = station_coordinates(catalogue)
+    assert coordinates.to_dict("index") == {
+        1: {"latitude": 28.45, "longitude": -16.27},
+        2: {"latitude": 28.05, "longitude": -16.71},
+    }
+
+
+def test_bundle_places_stations_on_the_map(hourly: pd.DataFrame) -> None:
+    result = train_and_evaluate(hourly, FAST)
+    coordinates = pd.DataFrame(
+        {"latitude": [28.45], "longitude": [-16.27]}, index=pd.Index([1], name="station_id")
+    )
+    bundle = build_bundle(
+        result.data, pd.Series({1: "NORTE", 2: "SUR"}), FAST, 0.5, {}, coordinates=coordinates
+    )
+    north = bundle.stations[bundle.stations["station_id"] == 1]
+    assert north[["latitude", "longitude"]].to_numpy().tolist()[0] == [28.45, -16.27]
+    assert bundle.stations.loc[bundle.stations["station_id"] == 2, "latitude"].isna().all()

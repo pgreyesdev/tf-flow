@@ -39,7 +39,19 @@ def bundle() -> ServingBundle:
     config = TrainingConfig(n_estimators=10)
     result = train_and_evaluate(hourly, config)
     names = pd.Series({1: "AUTOPISTA NORTE", 2: "AUTOPISTA SUR"})
-    return build_bundle(result.data, names, config, result.high_threshold, {"volume_wape": 0.12})
+    # La 2 no consta en el catálogo de estaciones: la API la sirve sin coordenadas.
+    coordinates = pd.DataFrame(
+        {"latitude": [28.4483194], "longitude": [-16.2736395]},
+        index=pd.Index([1], name="station_id"),
+    )
+    return build_bundle(
+        result.data,
+        names,
+        config,
+        result.high_threshold,
+        {"volume_wape": 0.12},
+        coordinates=coordinates,
+    )
 
 
 @pytest.fixture

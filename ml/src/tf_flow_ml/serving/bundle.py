@@ -38,12 +38,42 @@ class ServingBundle:
     high_threshold: float
     history: pd.DataFrame
     stations: pd.DataFrame
-    """Una fila por estación y sentido: ``station_id``, ``direction``, ``name``."""
+    """Una fila por estación y sentido: ``station_id``, ``direction``, ``name`` y, si el catálogo
+    del Cabildo las trae, ``latitude`` y ``longitude``."""
     data_until: pd.Timestamp
     metrics: dict[str, float]
     forecasts: pd.DataFrame | None = None
     """Previsiones ya calculadas de cada estación para los próximos meses, con sus motivos. La API
     las sirve tal cual y solo usa los modelos para las horas que falten."""
+
+
+TENERIFE_BOUNDS = {"latitude": (27.9, 28.7), "longitude": (-17.0, -16.0)}
+"""Coordenadas que se aceptan del catálogo: las que caen fuera de la isla son erratas."""
+
+
+def station_coordinates(catalogue: pd.DataFrame) -> pd.DataFrame:
+    """Latitud y longitud de cada estación según el catálogo de estaciones del Cabildo.
+
+    El catálogo repite estaciones (una fila por tramo); se toma la primera posición válida.
+    """
+    coordinates = catalogue.rename(
+        columns={
+            "estacion_id": "station_id",
+            "estacion_latitud": "latitude",
+            "estacion_longitud": "longitude",
+        }
+    )[["station_id", "latitude", "longitude"]]
+    coordinates = coordinates.apply(pd.to_numeric, errors="coerce").dropna()
+    inside = pd.Series(True, index=coordinates.index)
+    for column, (low, high) in TENERIFE_BOUNDS.items():
+        inside &= coordinates[column].between(low, high)
+    valid: pd.DataFrame = (
+        coordinates[inside]
+        .astype({"station_id": int})
+        .drop_duplicates("station_id")
+        .set_index("station_id")
+    )
+    return valid
 
 
 def build_bundle(
@@ -52,6 +82,8 @@ def build_bundle(
     config: TrainingConfig,
     high_threshold: float,
     metrics: dict[str, float],
+    *,
+    coordinates: pd.DataFrame | None = None,
 ) -> ServingBundle:
     """Entrena los modelos finales con todo ``data`` (ya con festivos y niveles)."""
     train = data[~in_lockdown(data["timestamp"])]
@@ -76,6 +108,8 @@ def build_bundle(
         .sort_values(STATION_KEYS)
         .reset_index(drop=True)
     )
+    if coordinates is not None:
+        stations = stations.join(coordinates, on="station_id")
     return ServingBundle(
         features=features,
         volume_model=volume_model,

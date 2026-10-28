@@ -25,6 +25,8 @@ class Station(BaseModel):
     direction: Direction
     direction_label: str = Field(description="Sentido según el punto kilométrico")
     name: str
+    latitude: float | None = Field(default=None, description="Del catálogo del Cabildo, si consta")
+    longitude: float | None = Field(default=None, description="Del catálogo del Cabildo, si consta")
 
 
 class Factor(BaseModel):
@@ -59,3 +61,13 @@ class ModelInfo(BaseModel):
     data_until: dt.datetime
     high_threshold: float
     metrics: dict[str, float] = Field(description="Métricas en el periodo de test")
+
+
+class StationNow(BaseModel):
+    station: Station
+    hour: HourlyForecast
+
+
+class NetworkNow(BaseModel):
+    time: dt.datetime = Field(description=f"Hora local ({TIMEZONE}) de la previsión")
+    stations: list[StationNow]

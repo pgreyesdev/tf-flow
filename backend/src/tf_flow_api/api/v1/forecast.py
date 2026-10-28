@@ -4,7 +4,7 @@ from typing import Annotated
 from fastapi import APIRouter, HTTPException, Path, Query, status
 
 from tf_flow_api.api.deps import ForecastDep
-from tf_flow_api.domain.forecast import DayForecast, ModelInfo, Station
+from tf_flow_api.domain.forecast import DayForecast, ModelInfo, NetworkNow, Station
 from tf_flow_api.services.forecast import DateOutOfRangeError, StationNotFoundError
 
 router = APIRouter(tags=["previsiones"])
@@ -37,6 +37,11 @@ def day_forecast(
         raise HTTPException(status.HTTP_404_NOT_FOUND, str(error)) from error
     except DateOutOfRangeError as error:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(error)) from error
+
+
+@router.get("/network/now", summary="Previsión de la hora actual en todas las estaciones")
+def network_now(service: ForecastDep) -> NetworkNow:
+    return service.network_now()
 
 
 @router.get("/model", summary="Datos y métricas del modelo en servicio")

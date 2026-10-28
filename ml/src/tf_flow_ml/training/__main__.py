@@ -14,7 +14,7 @@ import joblib
 from tf_flow_ml.evaluation.metrics import ClassificationReport, RegressionReport
 from tf_flow_ml.ingestion.snapshot import load_snapshot
 from tf_flow_ml.processing.aggregation import aggregate_hourly
-from tf_flow_ml.serving.bundle import build_bundle, save_bundle
+from tf_flow_ml.serving.bundle import build_bundle, save_bundle, station_coordinates
 from tf_flow_ml.serving.predictor import precompute_forecasts
 from tf_flow_ml.training.pipeline import TrainingConfig, TrainingResult, train_and_evaluate
 from tf_flow_ml.training.report import render_report
@@ -54,6 +54,11 @@ def main(argv: list[str] | None = None) -> None:
         help="carpeta de ficheros de MLflow; por defecto OUT/mlruns",
     )
     parser.add_argument(
+        "--stations-dir",
+        type=Path,
+        help="instantánea del catálogo de estaciones, para situarlas en el mapa",
+    )
+    parser.add_argument(
         "--serving-bundle",
         type=Path,
         help="reentrena LightGBM con todo el histórico y guarda el paquete que sirve la API",
@@ -86,7 +91,12 @@ def main(argv: list[str] | None = None) -> None:
     logger.info("Informe y modelos guardados en %s", args.out)
     if args.serving_bundle:
         metrics = _serving_metrics(result)
-        bundle = build_bundle(result.data, names, config, result.high_threshold, metrics)
+        coordinates = (
+            station_coordinates(load_snapshot(args.stations_dir)) if args.stations_dir else None
+        )
+        bundle = build_bundle(
+            result.data, names, config, result.high_threshold, metrics, coordinates=coordinates
+        )
         started = time.monotonic()
         bundle.forecasts = precompute_forecasts(bundle)
         logger.info(

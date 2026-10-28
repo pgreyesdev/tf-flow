@@ -40,6 +40,8 @@ jobs:
           if ! ls -d data/raw/traffic/*/ > /dev/null 2>&1; then
             uv run python -m tf_flow_ml.ingestion traffic --years 2019-2026 --out data/raw
           fi
+      - name: Descargar el catálogo de estaciones
+        run: uv run python -m tf_flow_ml.ingestion stations --out data/raw
       - name: Recuperar el historial de MLflow
         uses: actions/cache@v4
         with:
@@ -53,7 +55,9 @@ jobs:
         run: |
           mkdir -p mlflow
           snapshot=$(ls -d data/raw/traffic/*/ | tail -n 1)
+          stations=$(ls -d data/raw/stations/*/ | tail -n 1)
           uv run python -m tf_flow_ml.training "$snapshot" --out artifacts \
+            --stations-dir "$stations" \
             --test-from "$TEST_FROM" --n-estimators "$N_ESTIMATORS" \
             --mlflow-uri sqlite:///mlflow/mlflow.db --mlflow-artifacts mlflow/artifacts \
             --serving-bundle artifacts/serving.joblib
