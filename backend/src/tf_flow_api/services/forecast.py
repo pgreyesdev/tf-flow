@@ -2,9 +2,10 @@
 
 import datetime as dt
 import re
+from collections import OrderedDict
 from collections.abc import Callable
 from dataclasses import asdict
-from functools import lru_cache
+from threading import Lock
 from zoneinfo import ZoneInfo
 
 import pandas as pd
@@ -70,6 +71,10 @@ def today_in_tenerife() -> dt.date:
 
 #: Días por estación y sentido que caben en caché: de sobra para toda la red y el rango servido.
 CACHE_SIZE = 4096
+#: Días que la web enseña a partir de hoy. Se calculan juntos cuando se pide uno que falta.
+OUTLOOK_DAYS = 7
+HOURS_PER_DAY = 24
+PAST_DAYS = 7
 
 
 class ForecastService:
@@ -83,8 +88,11 @@ class ForecastService:
         self.max_days = max_days
         self.today = today
         # El modelo no cambia mientras el proceso vive, así que cada día se calcula una sola vez.
-        # Las páginas piden la semana entera de golpe y explicar cada hora con SHAP es lo más caro.
-        self._predict_day = lru_cache(maxsize=CACHE_SIZE)(self._compute_day)
+        # Calcular varios días en una sola llamada al modelo cuesta poco más que uno, y la web pide
+        # la semana entera de golpe: el primer día que falta trae consigo el resto de la semana.
+        # El cálculo ocupa la CPU entera, así que se hace de uno en uno y nadie repite el trabajo.
+        self._cache: OrderedDict[tuple[int, int, dt.date], DayForecast] = OrderedDict()
+        self._lock = Lock()
         catalogue = predictor.bundle.stations
         self._stations: dict[tuple[int, int], Station] = {
             (station.station_id, station.direction): station
@@ -112,30 +120,54 @@ class ForecastService:
         today = self.today()
         date = date or today
         last = today + dt.timedelta(days=self.max_days)
-        if not today - dt.timedelta(days=7) <= date <= last:
+        if not today - dt.timedelta(days=PAST_DAYS) <= date <= last:
             raise DateOutOfRangeError(
                 f"Solo hay previsiones desde hace una semana hasta el {last.isoformat()}"
             )
 
-        return self._predict_day(station_id, direction, date)
+        key = (station_id, direction, date)
+        with self._lock:
+            if key not in self._cache:
+                week = (today + dt.timedelta(days=i) for i in range(OUTLOOK_DAYS))
+                days = sorted(
+                    day
+                    for day in {date, *week}
+                    if day <= last and (station_id, direction, day) not in self._cache
+                )
+                for forecast in self._compute_days(station, days):
+                    self._cache[(station_id, direction, forecast.date)] = forecast
+                while len(self._cache) > CACHE_SIZE:
+                    self._cache.popitem(last=False)
+            self._cache.move_to_end(key)
+            return self._cache[key]
 
-    def _compute_day(self, station_id: int, direction: int, date: dt.date) -> DayForecast:
-        station = self._stations[(station_id, direction)]
-        hours = list(pd.date_range(pd.Timestamp(date), periods=24, freq="h"))
-        forecasts = [
-            HourlyForecast(
-                time=f.timestamp.to_pydatetime(),
-                vehicles=f.vehicles,
-                level=Level(f.level),
-                probability_high=f.probability_high,
-                factors=[Factor(**asdict(factor)) for factor in f.factors],
-            )
-            for f in self.predictor.predict(station_id, direction, hours)
+    def _compute_days(self, station: Station, days: list[dt.date]) -> list[DayForecast]:
+        hours = [
+            pd.Timestamp(day) + pd.Timedelta(hours=hour)
+            for day in days
+            for hour in range(HOURS_PER_DAY)
         ]
-        return DayForecast(
-            station=station,
-            date=date,
-            data_until=self.predictor.bundle.data_until.to_pydatetime(),
-            hours=forecasts,
-            worst_hour=max(forecasts, key=lambda h: h.probability_high),
-        )
+        predicted = self.predictor.predict(station.station_id, station.direction, hours)
+        data_until = self.predictor.bundle.data_until.to_pydatetime()
+        result = []
+        for i, day in enumerate(days):
+            forecasts = [
+                HourlyForecast(
+                    time=f.timestamp.to_pydatetime(),
+                    vehicles=f.vehicles,
+                    level=Level(f.level),
+                    probability_high=f.probability_high,
+                    factors=[Factor(**asdict(factor)) for factor in f.factors],
+                )
+                for f in predicted[i * HOURS_PER_DAY : (i + 1) * HOURS_PER_DAY]
+            ]
+            result.append(
+                DayForecast(
+                    station=station,
+                    date=day,
+                    data_until=data_until,
+                    hours=forecasts,
+                    worst_hour=max(forecasts, key=lambda h: h.probability_high),
+                )
+            )
+        return result

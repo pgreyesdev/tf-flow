@@ -125,23 +125,39 @@ def test_station_names_are_readable(raw: str, expected: str) -> None:
     assert readable_name(raw) == expected
 
 
-def test_each_day_is_predicted_once(
+def test_predicts_the_week_in_one_go_and_each_day_once(
     forecast: ForecastService, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    calls: list[tuple[int, int]] = []
+    calls: list[int] = []
     predict = forecast.predictor.predict
 
     def counting(
         station_id: int, direction: int, hours: list[pd.Timestamp]
     ) -> list[HourlyForecast]:
-        calls.append((station_id, direction))
+        calls.append(len(hours))
         return predict(station_id, direction, hours)
 
     monkeypatch.setattr(forecast.predictor, "predict", counting)
     station = forecast.stations()[0]
     first = forecast.day_forecast(station.station_id, station.direction, TODAY)
-    again = forecast.day_forecast(station.station_id, station.direction, None)
-    assert again == first
-    assert len(calls) == 1
-    forecast.day_forecast(station.station_id, station.direction, TODAY + dt.timedelta(days=1))
-    assert len(calls) == 2
+    assert calls == [7 * 24]
+    assert forecast.day_forecast(station.station_id, station.direction, None) == first
+    friday = forecast.day_forecast(
+        station.station_id, station.direction, TODAY + dt.timedelta(days=6)
+    )
+    assert calls == [7 * 24]
+    assert friday.date == TODAY + dt.timedelta(days=6)
+    assert [h.time.date() for h in friday.hours] == [friday.date] * 24
+
+    later = forecast.day_forecast(
+        station.station_id, station.direction, TODAY + dt.timedelta(days=10)
+    )
+    assert calls == [7 * 24, 24]
+    assert later.date == TODAY + dt.timedelta(days=10)
+
+
+def test_a_week_in_one_go_matches_day_by_day(forecast: ForecastService) -> None:
+    station = forecast.stations()[0]
+    days = [TODAY + dt.timedelta(days=i) for i in range(3)]
+    together = forecast._compute_days(station, days)
+    assert together == [forecast._compute_days(station, [day])[0] for day in days]
