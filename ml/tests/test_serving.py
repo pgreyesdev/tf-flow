@@ -21,6 +21,7 @@ from tf_flow_ml.serving.predictor import (
     Predictor,
     UnknownStationError,
     precompute_forecasts,
+    precompute_window,
 )
 from tf_flow_ml.training.features import FEATURES
 from tf_flow_ml.training.pipeline import TrainingConfig, train_and_evaluate
@@ -136,6 +137,19 @@ def test_hours_beyond_the_table_are_computed(bundle: ServingBundle) -> None:
     assert predictor.predict(station_id, direction, later) == Predictor(bundle).compute(
         station_id, direction, later
     )
+
+
+def test_precompute_window_covers_the_last_week_and_the_coming_weeks(
+    bundle: ServingBundle,
+) -> None:
+    after_data = bundle.data_until.normalize() + pd.Timedelta(days=1)
+    today = after_data + pd.Timedelta(days=30, hours=15)
+    start, days = precompute_window(bundle, today, days=45)
+    assert start == today.normalize() - pd.Timedelta(days=7)
+    assert days == 52
+    # Si se entrena justo tras publicarse los datos, no hay semana pasada sin datos que calcular.
+    start, days = precompute_window(bundle, after_data, days=45)
+    assert (start, days) == (after_data, 45)
 
 
 def asdict_shallow(bundle: ServingBundle) -> dict[str, object]:

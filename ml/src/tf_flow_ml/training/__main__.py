@@ -10,12 +10,13 @@ from pathlib import Path
 from typing import cast
 
 import joblib
+import pandas as pd
 
 from tf_flow_ml.evaluation.metrics import ClassificationReport, RegressionReport
 from tf_flow_ml.ingestion.snapshot import load_snapshot
 from tf_flow_ml.processing.aggregation import aggregate_hourly
 from tf_flow_ml.serving.bundle import build_bundle, save_bundle, station_coordinates
-from tf_flow_ml.serving.predictor import precompute_forecasts
+from tf_flow_ml.serving.predictor import precompute_forecasts, precompute_window
 from tf_flow_ml.training.pipeline import TrainingConfig, TrainingResult, train_and_evaluate
 from tf_flow_ml.training.report import render_report
 
@@ -98,10 +99,14 @@ def main(argv: list[str] | None = None) -> None:
             result.data, names, config, result.high_threshold, metrics, coordinates=coordinates
         )
         started = time.monotonic()
-        bundle.forecasts = precompute_forecasts(bundle)
+        today = pd.Timestamp.now(tz="Atlantic/Canary").tz_localize(None)
+        start, days = precompute_window(bundle, today)
+        bundle.forecasts = precompute_forecasts(bundle, days, start)
         logger.info(
-            "%s horas de previsión precalculadas en %.0f s",
+            "%s horas de previsión precalculadas (%s días desde el %s) en %.0f s",
             f"{len(bundle.forecasts):,}",
+            days,
+            start.date(),
             time.monotonic() - started,
         )
         digest = save_bundle(bundle, args.serving_bundle)

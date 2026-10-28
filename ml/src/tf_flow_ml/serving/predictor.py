@@ -32,8 +32,13 @@ FEATURE_LABELS: Final = {
 
 MAX_FACTORS: Final = 3
 """Motivos que se guardan por hora en las previsiones precalculadas."""
-PRECOMPUTED_DAYS: Final = 365
-"""Días tras el último dato que se dejan calculados al entrenar: de sobra hasta el siguiente."""
+PRECOMPUTED_PAST_DAYS: Final = 7
+"""Días anteriores al entrenamiento que se dejan calculados: la web enseña la última semana."""
+PRECOMPUTED_DAYS: Final = 45
+"""Días desde el entrenamiento que se dejan calculados. Explicar un día de una estación con SHAP
+cuesta varios segundos en el modelo real, así que no se calcula un año entero: con 45 días la web,
+que mira hasta 14 días por delante, tiene un mes de margen hasta el siguiente entrenamiento. Lo que
+falte se calcula al pedirlo."""
 
 
 class UnknownStationError(LookupError):
@@ -175,15 +180,29 @@ def to_table(station_id: int, direction: int, forecasts: list[HourlyForecast]) -
     return table
 
 
-def precompute_forecasts(bundle: ServingBundle, days: int = PRECOMPUTED_DAYS) -> pd.DataFrame:
-    """Calcula las previsiones de todas las estaciones para los ``days`` días que siguen al último
-    dato publicado.
+def precompute_window(
+    bundle: ServingBundle, today: pd.Timestamp, days: int = PRECOMPUTED_DAYS
+) -> tuple[pd.Timestamp, int]:
+    """Primer día y número de días a precalcular: de una semana antes de ``today`` a ``days``
+    después, sin empezar antes del día siguiente al último dato."""
+    first_without_data = bundle.data_until.normalize() + pd.Timedelta(days=1)
+    start = max(first_without_data, today.normalize() - pd.Timedelta(days=PRECOMPUTED_PAST_DAYS))
+    end = today.normalize() + pd.Timedelta(days=days)
+    return start, max((end - start).days, 0)
+
+
+def precompute_forecasts(
+    bundle: ServingBundle, days: int, start: pd.Timestamp | None = None
+) -> pd.DataFrame:
+    """Calcula las previsiones de todas las estaciones para ``days`` días desde ``start`` (por
+    defecto, el día siguiente al último dato publicado).
 
     Explicar cada hora con SHAP cuesta CPU; aquí se paga una vez, en la máquina que entrena, y el
     servidor solo tiene que leer el resultado.
     """
     predictor = Predictor(bundle)
-    start = bundle.data_until.normalize() + pd.Timedelta(days=1)
+    if start is None:
+        start = bundle.data_until.normalize() + pd.Timedelta(days=1)
     hours = list(pd.date_range(start, periods=days * 24, freq="h"))
     table = pd.concat(
         [
