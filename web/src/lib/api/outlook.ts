@@ -22,20 +22,14 @@ export async function getOutlook(station: Station, date: string, today: string):
   const dates = Array.from({ length: OUTLOOK_DAYS }, (_, i) => addDays(today, i));
   const fetchDay = (day: string) => getDayForecast(station.station_id, station.direction, day);
 
-  const [selected, ...week] = await Promise.allSettled([
-    fetchDay(date),
-    ...dates.filter((d) => d !== date).map(fetchDay),
-  ]);
-  if (selected?.status !== "fulfilled") {
-    throw selected?.reason;
-  }
-  const forecasts = [
-    selected.value,
-    ...week.flatMap((r) => (r.status === "fulfilled" ? [r.value] : [])),
-  ];
+  // Primero el día elegido, solo: si la API va justa, la semana no le roba tiempo y como mucho
+  // falta algún día de la lista.
+  const forecast = await fetchDay(date);
+  const week = await Promise.allSettled(dates.filter((d) => d !== date).map(fetchDay));
+  const forecasts = [forecast, ...week.flatMap((r) => (r.status === "fulfilled" ? [r.value] : []))];
   const days = forecasts
     .filter((f) => dates.includes(f.date))
     .map(summarizeDay)
     .sort((a, b) => a.date.localeCompare(b.date));
-  return { forecast: selected.value, days };
+  return { forecast, days };
 }
