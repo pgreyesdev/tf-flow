@@ -1,5 +1,8 @@
-import { Search } from "lucide-react";
-import Form from "next/form";
+"use client";
+
+import { LoaderCircle, Search } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useTransition } from "react";
 
 import type { Station } from "@/lib/api/schemas";
 import { stationKey, stationLabel } from "@/lib/stations";
@@ -13,12 +16,35 @@ interface ForecastFormProps {
   maxDate: string;
 }
 
-const field = "mt-1.5 block min-h-12 w-full glass px-3.5 text-base text-ink";
+const field =
+  "mt-1.5 block min-h-12 w-full rounded-2xl border border-glass-line bg-glass px-3.5 text-base text-ink";
 
-/** Formulario de búsqueda. Envía por GET, así que funciona también sin JavaScript. */
+/**
+ * Formulario de búsqueda. Envía por GET, así que funciona también sin JavaScript; con él, navega
+ * sin recargar y el botón avisa de que está cargando hasta que llega la nueva previsión.
+ */
 export function ForecastForm({ stations, selected, date, minDate, maxDate }: ForecastFormProps) {
+  const router = useRouter();
+  const [pending, startTransition] = useTransition();
+
   return (
-    <Form action="/prediccion" className="grid gap-4">
+    <form
+      action="/prediccion"
+      aria-busy={pending}
+      className="grid gap-4"
+      onSubmit={(event) => {
+        event.preventDefault();
+        if (pending) {
+          return;
+        }
+        const data = new FormData(event.currentTarget);
+        const query = new URLSearchParams({
+          estacion: String(data.get("estacion") ?? ""),
+          fecha: String(data.get("fecha") ?? ""),
+        });
+        startTransition(() => router.push(`/prediccion?${query.toString()}`));
+      }}
+    >
       <div>
         <label htmlFor="estacion" className="font-semibold">
           Punto de medida
@@ -46,10 +72,24 @@ export function ForecastForm({ stations, selected, date, minDate, maxDate }: For
           className={field}
         />
       </div>
-      <button type="submit" className={`${buttonStyles.primary} min-h-12 w-full`}>
-        <Search aria-hidden="true" className="size-5" />
-        Ver previsión
+      <button
+        type="submit"
+        aria-disabled={pending}
+        className={`${buttonStyles.primary} min-h-12 w-full aria-disabled:cursor-wait`}
+      >
+        {pending ? (
+          <LoaderCircle
+            aria-hidden="true"
+            className="size-5 animate-spin motion-reduce:animate-none"
+          />
+        ) : (
+          <Search aria-hidden="true" className="size-5" />
+        )}
+        {pending ? "Cargando previsión…" : "Ver previsión"}
       </button>
-    </Form>
+      <p role="status" className="sr-only">
+        {pending ? "Cargando la previsión" : ""}
+      </p>
+    </form>
   );
 }

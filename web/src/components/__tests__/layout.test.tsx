@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 
 import { AppPromo } from "@/components/app-promo";
 import { ForecastForm } from "@/components/forecast-form";
@@ -6,11 +6,8 @@ import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
 import { dayForecast, STATIONS } from "@/test/fixtures";
 
-vi.mock("next/form", () => ({
-  default: ({ action, ...props }: React.ComponentProps<"form"> & { action: string }) => (
-    <form action={action} {...props} />
-  ),
-}));
+const push = vi.fn();
+vi.mock("next/navigation", () => ({ useRouter: () => ({ push }) }));
 
 describe("site chrome", () => {
   it("links every section", () => {
@@ -72,5 +69,26 @@ describe("ForecastForm", () => {
     expect(date).toHaveAttribute("min", "2026-10-20");
     expect(date).toHaveAttribute("max", "2026-11-10");
     expect(select.closest("form")).toHaveAttribute("action", "/prediccion");
+  });
+
+  it("navigates to the forecast and says it is loading", async () => {
+    let finish = () => {};
+    push.mockImplementation(() => new Promise<void>((resolve) => (finish = resolve)));
+    render(
+      <ForecastForm
+        stations={STATIONS}
+        selected="57:-1"
+        date="2026-10-27"
+        minDate="2026-10-20"
+        maxDate="2026-11-10"
+      />,
+    );
+    fireEvent.change(screen.getByLabelText("Punto de medida"), { target: { value: "12:0" } });
+    fireEvent.click(screen.getByRole("button", { name: "Ver previsión" }));
+    expect(push).toHaveBeenCalledWith("/prediccion?estacion=12%3A0&fecha=2026-10-27");
+    const button = await screen.findByRole("button", { name: "Cargando previsión…" });
+    expect(button).toHaveAttribute("aria-disabled", "true");
+    expect(screen.getByRole("status")).toHaveTextContent("Cargando la previsión");
+    finish();
   });
 });
