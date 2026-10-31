@@ -3,6 +3,7 @@
 import { Bot, LoaderCircle, RotateCcw, SendHorizontal, UserRound } from "lucide-react";
 import { useEffect, useId, useRef, useState, useTransition } from "react";
 
+import { RichText } from "@/components/rich-text";
 import type { ChatMessage } from "@/lib/api/schemas";
 import { type ChatResult, MAX_MESSAGE_LENGTH, TOOL_LABELS } from "@/lib/chat";
 import { buttonStyles, cx } from "@/lib/ui";
@@ -189,14 +190,15 @@ function Message({ entry }: { entry: Entry }) {
       </span>
       <div className={cx("max-w-[85%] sm:max-w-[75%]", mine && "text-right")}>
         <p className="sr-only">{mine ? "Tú:" : "Asistente:"}</p>
-        <p
-          className={cx(
-            "inline-block rounded-2xl px-4 py-3 text-left whitespace-pre-line",
-            mine ? "rounded-tr-md bg-accent text-accent-ink" : "rounded-tl-md bg-glass",
-          )}
-        >
-          {entry.content}
-        </p>
+        {mine ? (
+          <p className="inline-block rounded-2xl rounded-tr-md bg-accent px-4 py-3 text-left whitespace-pre-line text-accent-ink">
+            {entry.content}
+          </p>
+        ) : (
+          <div className="inline-block rounded-2xl rounded-tl-md bg-glass px-4 py-3 text-left">
+            <RichText text={entry.content} />
+          </div>
+        )}
         {tools.length > 0 && (
           <p className="mt-1 text-sm text-ink-soft">El asistente {tools.join(" y ")}.</p>
         )}
