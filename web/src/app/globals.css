@@ -25,6 +25,8 @@
     --high-ink: #4c0519;
     --accent: #7dd3fc;
     --accent-ink: #082f49;
+    /* Incidencias de la DGT: naranja, distinto de los tres niveles de tráfico. */
+    --incident: #fb923c;
 }
 
 @theme inline {
@@ -42,6 +44,7 @@
     --color-high-ink: var(--high-ink);
     --color-accent: var(--accent);
     --color-accent-ink: var(--accent-ink);
+    --color-incident: var(--incident);
     --font-sans: var(--font-manrope), ui-sans-serif, system-ui, sans-serif;
     --font-display: var(--font-display), var(--font-manrope), ui-sans-serif, sans-serif;
 }

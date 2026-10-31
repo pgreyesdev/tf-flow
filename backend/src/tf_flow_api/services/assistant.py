@@ -23,6 +23,7 @@ from tf_flow_api.services.forecast import (
     StationNotFoundError,
     today_in_tenerife,
 )
+from tf_flow_api.services.incidents import IncidentService
 
 logger = logging.getLogger(__name__)
 
@@ -41,8 +42,10 @@ estación busca la persona, búscala por nombre; si no indica el sentido y la v�
 consulta ambos o pregunta.
 
 Las previsiones salen de un modelo entrenado con datos históricos que el Cabildo publica con un \
-mes de retraso, así que son orientativas: no conocen accidentes, obras ni eventos de hoy. Los \
-niveles son low (fluido), medium (denso) y high (atasco fuerte). Las horas son locales de Canarias.
+mes de retraso, así que son orientativas: no conocen accidentes, obras ni eventos de hoy. Para lo \
+que pasa ahora mismo consulta las incidencias de la DGT y, si hay alguna en la vía por la que \
+preguntan, menciónala. Los niveles son low (fluido), medium (denso) y high (atasco fuerte). Las \
+horas son locales de Canarias.
 
 Si te preguntan algo que no tiene que ver con el tráfico de Tenerife, dilo con amabilidad y \
 reconduce la conversación."""
@@ -85,6 +88,13 @@ TOOLS: list[FunctionToolParam] = [
         },
     ),
     _tool(
+        "get_incidents",
+        "Incidencias de tráfico activas ahora mismo en Tenerife según la DGT (accidentes, obras, "
+        "retenciones, cortes): tipo, vía, punto kilométrico, municipio y desde cuándo. Filtra por "
+        "vía, como 'TF-5'; con una cadena vacía devuelve todas.",
+        {"road": {"type": "string", "description": "Vía, como 'TF-1', o vacío"}},
+    ),
+    _tool(
         "get_model_info",
         "Hasta qué fecha llegan los datos del modelo y qué precisión tuvo en el periodo de test.",
         {},
@@ -94,6 +104,10 @@ TOOLS: list[FunctionToolParam] = [
 
 class _FindStations(BaseModel):
     query: str = Field(max_length=100)
+
+
+class _Incidents(BaseModel):
+    road: str = Field(default="", max_length=20)
 
 
 class _DayForecast(BaseModel):
@@ -110,6 +124,11 @@ def _fold(text: str) -> str:
     """Minúsculas y sin tildes, para buscar 'guimar' y encontrar 'GÜÍMAR'."""
     decomposed = unicodedata.normalize("NFKD", text.casefold())
     return "".join(c for c in decomposed if not unicodedata.combining(c))
+
+
+def _road(text: str) -> str:
+    """Nombre de vía comparable: 'tf 5', 'TF5' y 'TF-5' son la misma."""
+    return "".join(c for c in _fold(text) if c.isalnum())
 
 
 class TokenBudget:
@@ -151,12 +170,15 @@ class AssistantService:
         self,
         responses: AsyncResponses,
         forecast: ForecastService,
+        incidents: IncidentService,
+        *,
         model: str,
         effort: Effort,
         budget: TokenBudget,
     ) -> None:
         self.responses = responses
         self.forecast = forecast
+        self.incidents = incidents
         self.model = model
         self.effort = effort
         self.budget = budget
@@ -206,7 +228,7 @@ class AssistantService:
                     {
                         "type": "function_call_output",
                         "call_id": call.call_id,
-                        "output": self._run_tool(call.name, call.arguments),
+                        "output": await self._run_tool(call.name, call.arguments),
                     }
                 )
         self.budget.spend(tokens)
@@ -236,24 +258,52 @@ class AssistantService:
             logger.exception("Error llamando a OpenAI")
             raise AssistantUnavailableError("El asistente no está disponible") from error
 
-    def _run_tool(self, name: str, raw_arguments: str) -> str:
+    async def _run_tool(self, name: str, raw_arguments: str) -> str:
         """Resultado de la herramienta; los errores empiezan por ``ERROR:`` para que el modelo
         los explique en lugar de inventar."""
         try:
             arguments = json.loads(raw_arguments or "{}")
-            if name == "find_stations":
-                query = _fold(_FindStations.model_validate(arguments).query)
-                found = [s.model_dump() for s in self.forecast.stations() if query in _fold(s.name)]
-                return json.dumps(found[:40], ensure_ascii=False)
-            if name == "get_day_forecast":
-                return self._forecast_summary(_DayForecast.model_validate(arguments))
-            if name == "get_model_info":
-                return self.forecast.model_info().model_dump_json()
-            return f"ERROR: herramienta desconocida {name}"
+            match name:
+                case "find_stations":
+                    output = self._find_stations(_FindStations.model_validate(arguments))
+                case "get_day_forecast":
+                    output = self._forecast_summary(_DayForecast.model_validate(arguments))
+                case "get_incidents":
+                    output = await self._incidents_summary(_Incidents.model_validate(arguments))
+                case "get_model_info":
+                    output = self.forecast.model_info().model_dump_json()
+                case _:
+                    output = f"ERROR: herramienta desconocida {name}"
+            return output
         except (json.JSONDecodeError, ValidationError) as error:
             return f"ERROR: argumentos no válidos ({error})"
         except (StationNotFoundError, DateOutOfRangeError) as error:
             return f"ERROR: {error}"
+
+    def _find_stations(self, request: _FindStations) -> str:
+        query = _fold(request.query)
+        found = [s.model_dump() for s in self.forecast.stations() if query in _fold(s.name)]
+        return json.dumps(found[:40], ensure_ascii=False)
+
+    async def _incidents_summary(self, request: _Incidents) -> str:
+        now = await self.incidents.current()
+        if not now.available:
+            return "ERROR: ahora mismo no se pueden consultar las incidencias de la DGT"
+        road = _road(request.road)
+        found = [
+            {
+                "tipo": i.label,
+                "efectos": i.details,
+                "via": i.road,
+                "km": i.kilometer,
+                "municipio": i.municipality,
+                "desde": i.start.isoformat(timespec="minutes") if i.start else None,
+                "hasta": i.end.isoformat(timespec="minutes") if i.end else None,
+            }
+            for i in now.incidents
+            if not road or _road(i.road or "") == road
+        ]
+        return json.dumps({"incidencias": found[:30], "total": len(found)}, ensure_ascii=False)
 
     def _forecast_summary(self, request: _DayForecast) -> str:
         """Resumen compacto de la previsión: lo justo para responder, con pocos tokens."""

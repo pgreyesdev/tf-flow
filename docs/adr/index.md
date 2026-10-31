@@ -15,3 +15,4 @@ consecuencias. Un ADR aceptado no se edita: si la decisión cambia, se escribe o
 | [0008](0008-asistente-claude.md) | Asistente conversacional con Claude y herramientas | Sustituida por 0009 |
 | [0009](0009-asistente-openai.md) | Asistente conversacional con OpenAI y herramientas | Aceptada |
 | [0010](0010-web-nextjs.md) | Web con Next.js, renderizado en servidor y CSP estricta | Aceptada |
+| [0011](0011-incidencias-dgt.md) | Incidencias en directo de la DGT | Aceptada |

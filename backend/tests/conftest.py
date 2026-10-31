@@ -1,5 +1,7 @@
 import datetime as dt
 from collections.abc import Iterator
+from pathlib import Path
+from zoneinfo import ZoneInfo
 
 import numpy as np
 import pandas as pd
@@ -9,12 +11,15 @@ from fastapi.testclient import TestClient
 from tf_flow_api.core.config import Environment, Settings
 from tf_flow_api.main import create_app
 from tf_flow_api.services.forecast import ForecastService
+from tf_flow_api.services.incidents import IncidentService
 from tf_flow_ml.processing.aggregation import BIN_COLUMNS, add_calendar_features
 from tf_flow_ml.serving.bundle import ServingBundle, build_bundle
 from tf_flow_ml.serving.predictor import Predictor
 from tf_flow_ml.training.pipeline import TrainingConfig, train_and_evaluate
 
 TODAY = dt.date(2025, 6, 2)
+NOW = dt.datetime(2025, 6, 2, 8, 30, tzinfo=ZoneInfo("Atlantic/Canary"))
+DGT_SAMPLE = Path(__file__).parent / "data" / "dgt_incidencias.xml"
 
 
 @pytest.fixture(scope="session")
@@ -65,12 +70,24 @@ def forecast(bundle: ServingBundle) -> ForecastService:
 
 
 @pytest.fixture
-def client(settings: Settings, forecast: ForecastService) -> Iterator[TestClient]:
-    with TestClient(create_app(settings, forecast)) as test_client:
+def incidents() -> IncidentService:
+    """Incidencias leídas de la muestra de la DGT, sin salir a la red."""
+
+    async def fetch(url: str) -> bytes:
+        return DGT_SAMPLE.read_bytes()
+
+    return IncidentService("https://dgt.example/feed.xml", fetch=fetch, now=lambda: NOW)
+
+
+@pytest.fixture
+def client(
+    settings: Settings, forecast: ForecastService, incidents: IncidentService
+) -> Iterator[TestClient]:
+    with TestClient(create_app(settings, forecast, incidents=incidents)) as test_client:
         yield test_client
 
 
 @pytest.fixture
-def client_without_model(settings: Settings) -> Iterator[TestClient]:
-    with TestClient(create_app(settings)) as test_client:
+def client_without_model(settings: Settings, incidents: IncidentService) -> Iterator[TestClient]:
+    with TestClient(create_app(settings, incidents=incidents)) as test_client:
         yield test_client

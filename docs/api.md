@@ -9,8 +9,40 @@ La API sirve las previsiones del modelo final. Todas las rutas cuelgan de `/api/
 | `GET /stations` | Estaciones y sentidos con previsión |
 | `GET /stations/{id}/forecast?direction=1&date=AAAA-MM-DD` | Previsión hora a hora de un día |
 | `GET /network/now` | Previsión de la hora actual en las estaciones con coordenadas, para el mapa |
+| `GET /incidents` | Incidencias de tráfico activas en Tenerife según la DGT ([ADR 0011](adr/0011-incidencias-dgt.md)) |
 | `GET /model` | Último dato con el que se entrenó, umbral de aviso y métricas en test |
 | `POST /assistant/chat` | Respuesta del asistente conversacional ([ADR 0009](adr/0009-asistente-openai.md)) |
+
+## Incidencias
+
+`available` es falso si no se ha podido leer la DGT en la última media hora; entonces `incidents`
+viene vacío y no significa que no haya incidencias. `updated` es la última lectura buena.
+
+```json
+{
+  "available": true,
+  "updated": "2026-10-31T21:15:00Z",
+  "source": "DGT · Punto de Acceso Nacional (DATEX II)",
+  "incidents": [
+    {
+      "id": "17264754",
+      "kind": "works",
+      "label": "Obras",
+      "details": ["Vía cortada"],
+      "road": "TF-82",
+      "kilometer": 9.5,
+      "municipality": "El Tanque",
+      "latitude": 28.352394,
+      "longitude": -16.780691,
+      "start": "2026-06-22T09:06:00Z",
+      "end": "2027-03-10T23:00:00Z"
+    }
+  ]
+}
+```
+
+`kind` es uno de `accident`, `congestion`, `works`, `obstruction`, `restriction`, `weather` u
+`other`.
 
 ## Previsión de un día
 

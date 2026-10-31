@@ -1,5 +1,7 @@
+import { TriangleAlert } from "lucide-react";
 import Link from "next/link";
 
+import { IncidentList, INCIDENTS_SOURCE, loadIncidents } from "@/components/incidents";
 import { IslandMap } from "@/components/island-map";
 import { LEVEL_CHIP, LevelBadge, LevelIcon } from "@/components/level-badge";
 import { getNetworkNow } from "@/lib/api/client";
@@ -17,7 +19,10 @@ function forecastHref(key: string) {
 
 /** El mapa de la portada: la isla en relieve y cada estación con su nivel de esta hora. */
 export async function NetworkMap() {
-  const network = await getNetworkNow().catch(() => undefined);
+  const [network, incidents] = await Promise.all([
+    getNetworkNow().catch(() => undefined),
+    loadIncidents(),
+  ]);
   const points = network ? mapPoints(network) : [];
   if (!network || points.length === 0) {
     return null;
@@ -40,6 +45,7 @@ export async function NetworkMap() {
         <div className="h-[22rem] sm:h-[34rem]">
           <IslandMap
             points={points}
+            incidents={incidents?.incidents}
             label={`Mapa en relieve de Tenerife con ${points.length} estaciones de aforo`}
           />
         </div>
@@ -56,8 +62,31 @@ export async function NetworkMap() {
               {LEVEL_INFO[level].label}: {counts[level]}
             </li>
           ))}
+          {incidents && (
+            <li className="inline-flex items-center gap-1.5 rounded-full bg-incident px-2.5 py-0.5 text-sm font-bold text-night">
+              <TriangleAlert aria-hidden="true" className="size-4" />
+              Incidencias: {incidents.incidents.length}
+            </li>
+          )}
         </ul>
       </div>
+
+      {incidents && (
+        <div className="glass mt-4 p-6">
+          <h3 className="text-lg font-bold">Incidencias ahora</h3>
+          <p className="mt-1 text-sm text-ink-soft">
+            Accidentes, obras y cortes que comunica la {INCIDENTS_SOURCE}. Se actualiza cada pocos
+            minutos.
+          </p>
+          <div className="mt-4 max-h-96 overflow-y-auto pr-2">
+            {incidents.incidents.length > 0 ? (
+              <IncidentList incidents={incidents.incidents} />
+            ) : (
+              <p>Sin incidencias comunicadas por la DGT ahora mismo.</p>
+            )}
+          </div>
+        </div>
+      )}
 
       <div className="mt-4 grid gap-4 md:grid-cols-2">
         <div className="glass p-6">

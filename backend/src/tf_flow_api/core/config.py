@@ -26,6 +26,10 @@ class Settings(BaseSettings):
     model_sha256: str | None = Field(default=None, pattern=r"^[0-9a-fA-F]{64}$")
     """Huella esperada del paquete; sin ella no se carga."""
     max_forecast_days: int = Field(default=14, ge=1, le=60)
+    incidents_feed_url: str = "https://nap.dgt.es/datex2/v3/dgt/SituationPublication/datex2_v36.xml"
+    """Incidencias en directo de la DGT (DATEX II v3.6)."""
+    incidents_refresh_seconds: int = Field(default=300, ge=60)
+    """Cada cuánto se vuelve a leer como mucho la DGT: el fichero es de toda España."""
     rate_limit_per_minute: int = Field(default=60, ge=1)
     """Peticiones por minuto y cliente; ``/health`` no cuenta."""
 

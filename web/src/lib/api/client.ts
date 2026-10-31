@@ -12,6 +12,8 @@ import {
   dayForecastSchema,
   type Direction,
   errorBodySchema,
+  type IncidentsNow,
+  incidentsNowSchema,
   type ModelInfo,
   modelInfoSchema,
   type NetworkNow,
@@ -37,6 +39,8 @@ export class ApiError extends Error {
 
 /** Las previsiones solo cambian cuando se publica un modelo nuevo: se reutilizan unos minutos. */
 const FORECAST_REVALIDATE_SECONDS = 600;
+/** La API lee la DGT cada cinco minutos: no tiene sentido preguntarle mucho más a menudo. */
+const INCIDENTS_REVALIDATE_SECONDS = 120;
 const READ_TIMEOUT_MS = 10_000;
 /** La primera previsión de una estación calcula su semana entera y en Fly puede tardar más. */
 const FORECAST_TIMEOUT_MS = 25_000;
@@ -98,6 +102,16 @@ export function getModelInfo(): Promise<ModelInfo> {
 /** La hora actual en toda la red, para el mapa. Lee las previsiones ya calculadas. */
 export function getNetworkNow(): Promise<NetworkNow> {
   return request("/api/v1/network/now", networkNowSchema, cached, FORECAST_TIMEOUT_MS);
+}
+
+/** Incidencias de tráfico de ahora mismo en Tenerife, según la DGT. */
+export function getIncidents(): Promise<IncidentsNow> {
+  return request(
+    "/api/v1/incidents",
+    incidentsNowSchema,
+    { next: { revalidate: INCIDENTS_REVALIDATE_SECONDS } },
+    READ_TIMEOUT_MS,
+  );
 }
 
 export function getDayForecast(

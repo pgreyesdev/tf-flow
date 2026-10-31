@@ -3,6 +3,7 @@ import datetime as dt
 import json
 from typing import Any, cast
 
+import httpx
 import httpx2
 import openai
 import pytest
@@ -22,6 +23,7 @@ from tf_flow_api.services.assistant import (
     TokenBudget,
 )
 from tf_flow_api.services.forecast import ForecastService
+from tf_flow_api.services.incidents import IncidentService
 
 pytestmark = pytest.mark.anyio
 
@@ -94,15 +96,23 @@ class FakeResponses:
 
 
 def service(
-    forecast: ForecastService, fake: FakeResponses, budget: int = 10_000
+    forecast: ForecastService,
+    fake: FakeResponses,
+    budget: int = 10_000,
+    incidents: IncidentService | None = None,
 ) -> AssistantService:
     return AssistantService(
         cast(AsyncResponses, fake),
         forecast,
+        incidents or IncidentService(fetch=_no_feed),
         model="gpt-5.4-mini",
         effort="low",
         budget=TokenBudget(budget, today=lambda: dt.date(2025, 6, 2)),
     )
+
+
+async def _no_feed(url: str) -> bytes:
+    raise httpx.ConnectError("sin red en los tests")
 
 
 ASK = [ChatMessage(role="user", content="¿Cómo estará la autopista sur a las 8?")]
@@ -339,6 +349,35 @@ def test_build_assistant_needs_key_and_model(forecast: ForecastService) -> None:
     keyless = Settings(environment=Environment.TEST)
     with_key = Settings(environment=Environment.TEST, openai_api_key=SecretStr("sk-test"))
 
-    assert build_assistant(keyless, forecast) is None
-    assert build_assistant(with_key, None) is None
-    assert isinstance(build_assistant(with_key, forecast), AssistantService)
+    incidents = IncidentService(fetch=_no_feed)
+
+    assert build_assistant(keyless, forecast, incidents) is None
+    assert build_assistant(with_key, None, incidents) is None
+    assert isinstance(build_assistant(with_key, forecast, incidents), AssistantService)
+
+
+async def test_reports_live_incidents(
+    forecast: ForecastService, incidents: IncidentService
+) -> None:
+    fake = FakeResponses(
+        tool_call("get_incidents", {"road": "tf 5"}),
+        tool_call("get_incidents", {}, call_id="call_2"),
+        text("Hay un accidente en la TF-5."),
+    )
+
+    reply = await service(forecast, fake, incidents=incidents).reply(ASK)
+
+    assert reply.tools_used == ["get_incidents", "get_incidents"]
+    on_road = json.loads(tool_output(fake.calls[1]))
+    assert on_road["total"] == 1
+    assert on_road["incidencias"][0]["via"] == "TF-5"
+    assert on_road["incidencias"][0]["tipo"] == "Accidente"
+    assert json.loads(tool_output(fake.calls[2]))["total"] == 3
+
+
+async def test_says_when_incidents_are_unavailable(forecast: ForecastService) -> None:
+    fake = FakeResponses(tool_call("get_incidents", {}), text("No puedo saberlo ahora."))
+
+    await service(forecast, fake).reply(ASK)
+
+    assert tool_output(fake.calls[1]).startswith("ERROR")

@@ -10,8 +10,9 @@ import type {
 } from "maplibre-gl";
 import { useEffect, useRef, useState } from "react";
 
-import type { Level } from "@/lib/api/schemas";
+import type { Incident, Level } from "@/lib/api/schemas";
 import { formatPercent } from "@/lib/format";
+import { incidentPlace, incidentSince, incidentTitle } from "@/lib/incidents";
 import { LEVEL_INFO } from "@/lib/levels";
 import type { MapPoint } from "@/lib/map";
 
@@ -33,6 +34,11 @@ const TERRAIN: RasterDEMSourceSpecification = {
   bounds: [-16.98, 27.96, -16.08, 28.64],
   attribution: "Relieve: Terrain Tiles (Mapzen, AWS Open Data)",
 };
+
+/** Las incidencias van en blanco con borde naranja: no se confunden con ningún nivel. */
+export const INCIDENT_COLOR = "#fb923c";
+
+const NO_INCIDENTS: Incident[] = [];
 
 const SEA = "#0a1a30";
 
@@ -104,6 +110,41 @@ function asGeoJson(points: MapPoint[]): GeoJSONSourceSpecification["data"] {
   };
 }
 
+function incidentsGeoJson(incidents: Incident[]): GeoJSONSourceSpecification["data"] {
+  return {
+    type: "FeatureCollection",
+    features: incidents.map((incident) => ({
+      type: "Feature" as const,
+      geometry: {
+        type: "Point" as const,
+        coordinates: [incident.longitude, incident.latitude],
+      },
+      properties: { id: incident.id },
+    })),
+  };
+}
+
+function paragraph(text: string, className?: string): HTMLParagraphElement {
+  const p = document.createElement("p");
+  if (className) {
+    p.className = className;
+  }
+  p.textContent = text;
+  return p;
+}
+
+function incidentPopup(incident: Incident): HTMLElement {
+  const box = document.createElement("div");
+  box.className = "space-y-1 text-night";
+  box.append(paragraph(incidentTitle(incident), "font-bold"), paragraph(incidentPlace(incident)));
+  const since = incidentSince(incident);
+  if (since) {
+    box.append(paragraph(since));
+  }
+  box.append(paragraph("Fuente: DGT", "text-xs opacity-70"));
+  return box;
+}
+
 /** Contenido del globo al pulsar una estación. Se construye con nodos: nada de HTML a mano. */
 function popupContent(point: MapPoint): HTMLElement {
   const box = document.createElement("div");
@@ -121,7 +162,15 @@ function popupContent(point: MapPoint): HTMLElement {
   return box;
 }
 
-export function IslandMap({ points, label }: { points: MapPoint[]; label: string }) {
+export function IslandMap({
+  points,
+  incidents = NO_INCIDENTS,
+  label,
+}: {
+  points: MapPoint[];
+  incidents?: Incident[];
+  label: string;
+}) {
   const container = useRef<HTMLDivElement>(null);
   const [failed, setFailed] = useState(false);
 
@@ -133,6 +182,7 @@ export function IslandMap({ points, label }: { points: MapPoint[]; label: string
     let map: MapLibreMap | undefined;
     let cancelled = false;
     const byId = new Map(points.map((p) => [p.stationId, p]));
+    const incidentsById = new Map(incidents.map((i) => [i.id, i]));
 
     void import("maplibre-gl")
       .then((maplibre) => {
@@ -189,6 +239,30 @@ export function IslandMap({ points, label }: { points: MapPoint[]; label: string
               "circle-pitch-alignment": "viewport",
             },
           });
+          map.addSource("incidents", { type: "geojson", data: incidentsGeoJson(incidents) });
+          map.addLayer({
+            id: "incidents",
+            type: "circle",
+            source: "incidents",
+            paint: {
+              "circle-color": "#ffffff",
+              "circle-radius": ["interpolate", ["linear"], ["zoom"], 8, 4, 11, 7, 13, 10],
+              "circle-stroke-color": INCIDENT_COLOR,
+              "circle-stroke-width": 3,
+              "circle-pitch-alignment": "viewport",
+            },
+          });
+          map.on("click", "incidents", (event) => {
+            const feature = event.features?.[0];
+            const incident = feature && incidentsById.get(String(feature.properties.id));
+            if (!map || !incident) {
+              return;
+            }
+            popup
+              .setLngLat([incident.longitude, incident.latitude])
+              .setDOMContent(incidentPopup(incident))
+              .addTo(map);
+          });
           map.on("click", "stations", (event) => {
             const feature = event.features?.[0];
             const point = feature && byId.get(Number(feature.properties.stationId));
@@ -200,12 +274,14 @@ export function IslandMap({ points, label }: { points: MapPoint[]; label: string
               .setDOMContent(popupContent(point))
               .addTo(map);
           });
-          map.on("mouseenter", "stations", () => {
-            map?.getCanvas().style.setProperty("cursor", "pointer");
-          });
-          map.on("mouseleave", "stations", () => {
-            map?.getCanvas().style.removeProperty("cursor");
-          });
+          for (const layer of ["stations", "incidents"]) {
+            map.on("mouseenter", layer, () => {
+              map?.getCanvas().style.setProperty("cursor", "pointer");
+            });
+            map.on("mouseleave", layer, () => {
+              map?.getCanvas().style.removeProperty("cursor");
+            });
+          }
         });
         map.on("error", (event) => {
           // Una tesela del mar que no existe no es un fallo: el resto del mapa sigue bien.
@@ -220,7 +296,7 @@ export function IslandMap({ points, label }: { points: MapPoint[]; label: string
       cancelled = true;
       map?.remove();
     };
-  }, [points]);
+  }, [points, incidents]);
 
   if (failed) {
     return (

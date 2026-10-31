@@ -18,5 +18,6 @@ export type ChatResult =
 export const TOOL_LABELS: Record<string, string> = {
   find_stations: "buscó estaciones",
   get_day_forecast: "consultó la previsión",
+  get_incidents: "consultó las incidencias",
   get_model_info: "revisó el modelo",
 };

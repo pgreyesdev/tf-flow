@@ -1,7 +1,9 @@
 import { ChevronDown, MapPin } from "lucide-react";
 import type { Metadata } from "next";
+import { Suspense } from "react";
 
 import { ForecastForm } from "@/components/forecast-form";
+import { NearbyIncidents } from "@/components/incidents";
 import { Notice } from "@/components/notice";
 import { Sky } from "@/components/sky";
 import { TrafficWeather } from "@/components/traffic-weather";
@@ -146,6 +148,12 @@ export default async function ForecastPage({ searchParams }: PageProps<"/predicc
         <Notice tone="error" title="No hay previsión para esta consulta">
           {result.error}
         </Notice>
+      )}
+
+      {station && date === today && (
+        <Suspense fallback={null}>
+          <NearbyIncidents station={station} />
+        </Suspense>
       )}
 
       {result && "forecast" in result ? (

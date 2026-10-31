@@ -3,11 +3,12 @@ import {
   askAssistant,
   getDayForecast,
   getModelInfo,
+  getIncidents,
   getNetworkNow,
   getStations,
 } from "@/lib/api/client";
 import { getHomeData } from "@/lib/api/featured";
-import { dayForecast, MODEL, STATIONS } from "@/test/fixtures";
+import { dayForecast, INCIDENTS, MODEL, STATIONS } from "@/test/fixtures";
 
 function json(body: unknown, status = 200, headers: Record<string, string> = {}) {
   return new Response(JSON.stringify(body), {
@@ -67,6 +68,12 @@ describe("API client", () => {
     const fetchMock = mockFetch(() => json(network));
     await expect(getNetworkNow()).resolves.toEqual(network);
     expect(String(fetchMock.mock.calls[0]![0])).toBe("http://api.test/api/v1/network/now");
+  });
+
+  it("reads the live incidents", async () => {
+    const fetchMock = mockFetch(() => json(INCIDENTS));
+    await expect(getIncidents()).resolves.toEqual(INCIDENTS);
+    expect(String(fetchMock.mock.calls[0]![0])).toBe("http://api.test/api/v1/incidents");
   });
 
   it.each([

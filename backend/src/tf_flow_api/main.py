@@ -1,5 +1,6 @@
 """Punto de entrada de la API: ``uvicorn tf_flow_api.main:app``."""
 
+import datetime as dt
 import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
@@ -16,6 +17,7 @@ from tf_flow_api.core.rate_limit import RateLimiter, rate_limit_middleware
 from tf_flow_api.core.security import add_security_headers
 from tf_flow_api.services.assistant import AssistantService, TokenBudget
 from tf_flow_api.services.forecast import ForecastService
+from tf_flow_api.services.incidents import IncidentService
 from tf_flow_ml.serving.bundle import load_bundle
 from tf_flow_ml.serving.predictor import Predictor
 
@@ -40,7 +42,7 @@ def load_forecast_service(settings: Settings) -> ForecastService | None:
 
 
 def build_assistant(
-    settings: Settings, forecast: ForecastService | None
+    settings: Settings, forecast: ForecastService | None, incidents: IncidentService
 ) -> AssistantService | None:
     """El asistente necesita la clave de OpenAI y el modelo de previsión."""
     if settings.openai_api_key is None or forecast is None:
@@ -49,6 +51,7 @@ def build_assistant(
     return AssistantService(
         client.responses,
         forecast,
+        incidents,
         model=settings.assistant_model,
         effort=settings.assistant_effort,
         budget=TokenBudget(settings.assistant_daily_token_budget),
@@ -59,16 +62,23 @@ def create_app(
     settings: Settings | None = None,
     forecast: ForecastService | None = None,
     assistant: AssistantService | None = None,
+    incidents: IncidentService | None = None,
 ) -> FastAPI:
-    """``forecast`` y ``assistant`` permiten a los tests inyectar servicios; si faltan, se crean
-    a partir de la configuración."""
+    """``forecast``, ``assistant`` e ``incidents`` permiten a los tests inyectar servicios; si
+    faltan, se crean a partir de la configuración."""
     settings = settings or get_settings()
     configure_logging(settings.log_level)
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         app.state.forecast = forecast or load_forecast_service(settings)
-        app.state.assistant = assistant or build_assistant(settings, app.state.forecast)
+        app.state.incidents = incidents or IncidentService(
+            settings.incidents_feed_url,
+            dt.timedelta(seconds=settings.incidents_refresh_seconds),
+        )
+        app.state.assistant = assistant or build_assistant(
+            settings, app.state.forecast, app.state.incidents
+        )
         app.state.assistant_limiter = RateLimiter(settings.assistant_rate_limit_per_minute)
         yield
 

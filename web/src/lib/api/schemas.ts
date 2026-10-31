@@ -55,6 +55,39 @@ export const networkNowSchema = z.object({
 });
 export type NetworkNow = z.infer<typeof networkNowSchema>;
 
+export const INCIDENT_KINDS = [
+  "accident",
+  "congestion",
+  "works",
+  "obstruction",
+  "restriction",
+  "weather",
+  "other",
+] as const;
+
+export const incidentSchema = z.object({
+  id: z.string(),
+  kind: z.enum(INCIDENT_KINDS),
+  label: z.string(),
+  details: z.array(z.string()),
+  road: z.string().nullish(),
+  kilometer: z.number().nullish(),
+  municipality: z.string().nullish(),
+  latitude: z.number().min(-90).max(90),
+  longitude: z.number().min(-180).max(180),
+  start: z.iso.datetime({ offset: true }).nullish(),
+  end: z.iso.datetime({ offset: true }).nullish(),
+});
+export type Incident = z.infer<typeof incidentSchema>;
+
+export const incidentsNowSchema = z.object({
+  available: z.boolean(),
+  updated: z.iso.datetime({ offset: true }).nullish(),
+  source: z.string(),
+  incidents: z.array(incidentSchema),
+});
+export type IncidentsNow = z.infer<typeof incidentsNowSchema>;
+
 export const modelInfoSchema = z.object({
   data_until: localDateTime,
   high_threshold: z.number(),

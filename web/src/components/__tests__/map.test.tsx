@@ -1,11 +1,12 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
 
 import { IslandMap } from "@/components/island-map";
+import { NearbyIncidents } from "@/components/incidents";
 import { NetworkMap, NetworkMapSkeleton } from "@/components/network-map";
-import { getNetworkNow } from "@/lib/api/client";
+import { getIncidents, getNetworkNow } from "@/lib/api/client";
 import type { NetworkNow } from "@/lib/api/schemas";
 import type { MapPoint } from "@/lib/map";
-import { hourly, STATIONS } from "@/test/fixtures";
+import { hourly, INCIDENTS, STATIONS } from "@/test/fixtures";
 
 type Handler = (event?: unknown) => void;
 
@@ -65,7 +66,7 @@ const maplibre = vi.hoisted(() => {
 });
 
 vi.mock("maplibre-gl", () => maplibre.module);
-vi.mock("@/lib/api/client", () => ({ getNetworkNow: vi.fn() }));
+vi.mock("@/lib/api/client", () => ({ getNetworkNow: vi.fn(), getIncidents: vi.fn() }));
 
 const POINTS: MapPoint[] = [
   {
@@ -84,11 +85,14 @@ beforeEach(() => {
   maplibre.handlers.clear();
   maplibre.popup.content = undefined;
   vi.stubGlobal("matchMedia", () => ({ matches: false }));
+  vi.mocked(getIncidents).mockResolvedValue(INCIDENTS);
 });
 
 describe("IslandMap", () => {
   it("draws the stations and opens their forecast from a popup", async () => {
-    const { unmount } = render(<IslandMap points={POINTS} label="Mapa de Tenerife" />);
+    const { unmount } = render(
+      <IslandMap points={POINTS} incidents={INCIDENTS.incidents} label="Mapa de Tenerife" />,
+    );
     expect(screen.getByRole("region", { name: "Mapa de Tenerife" })).toBeInTheDocument();
     await waitFor(() => expect(maplibre.handlers.has("load")).toBe(true));
     expect(maplibre.module.setWorkerUrl).toHaveBeenCalledWith(
@@ -109,6 +113,19 @@ describe("IslandMap", () => {
     const popup = maplibre.popup.content!;
     expect(popup).toHaveTextContent("Los CristianosAtasco · 87 % de riesgo de atasco");
     expect(within(popup).getByRole("link")).toHaveAttribute("href", "/prediccion?estacion=57%3A1");
+
+    maplibre.handlers.get("mouseenter:incidents")!();
+    expect(maplibre.canvas.style.cursor).toBe("pointer");
+    maplibre.handlers.get("mouseleave:incidents")!();
+    maplibre.handlers.get("click:incidents")!({ features: [] });
+    maplibre.handlers.get("click:incidents")!({ features: [{ properties: { id: "17264754" } }] });
+    expect(maplibre.popup.content).toHaveTextContent(
+      "Obras · Vía cortadaTF-82, km 9,5 · El TanqueDesde el 22 junFuente: DGT",
+    );
+    maplibre.handlers.get("click:incidents")!({
+      features: [{ properties: { id: "1" } }],
+    });
+    expect(maplibre.popup.content).toHaveTextContent("Accidente");
 
     const error = vi.spyOn(console, "error").mockImplementation(() => {});
     maplibre.handlers.get("error")!({ sourceId: "relief", error: new Error("tesela") });
@@ -133,6 +150,33 @@ describe("IslandMap", () => {
   });
 });
 
+describe("NearbyIncidents", () => {
+  const station = { ...STATIONS[0]!, latitude: 28.05, longitude: -16.71 };
+
+  it("warns about incidents near the station", async () => {
+    render((await NearbyIncidents({ station }))!);
+    expect(
+      screen.getByRole("heading", { name: "Hay una incidencia cerca de este punto ahora mismo" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Accidente")).toBeInTheDocument();
+    expect(screen.queryByText(/Obras/)).not.toBeInTheDocument();
+  });
+
+  it("counts several incidents", async () => {
+    const near = INCIDENTS.incidents.map((i) => ({ ...i, latitude: 28.05, longitude: -16.71 }));
+    vi.mocked(getIncidents).mockResolvedValue({ ...INCIDENTS, incidents: near });
+    render((await NearbyIncidents({ station }))!);
+    expect(screen.getByRole("heading", { name: /Hay 2 incidencias/ })).toBeInTheDocument();
+  });
+
+  it("stays quiet without coordinates, incidents or source", async () => {
+    expect(await NearbyIncidents({ station: STATIONS[0]! })).toBeNull();
+    expect(await NearbyIncidents({ station: { ...station, latitude: 28.5 } })).toBeNull();
+    vi.mocked(getIncidents).mockRejectedValue(new Error("caída"));
+    expect(await NearbyIncidents({ station })).toBeNull();
+  });
+});
+
 describe("NetworkMap", () => {
   const station = { ...STATIONS[0]!, latitude: 28.05, longitude: -16.71 };
   const network: NetworkNow = {
@@ -146,7 +190,22 @@ describe("NetworkMap", () => {
     expect(screen.getByRole("heading", { name: "La isla, ahora" })).toBeInTheDocument();
     expect(screen.getByText(/Previsión de las 08:00 en 1 puntos/)).toBeInTheDocument();
     const legend = screen.getByRole("list", { name: "Leyenda" });
-    expect(legend).toHaveTextContent("Fluido: 0Denso: 0Atasco: 1");
+    expect(legend).toHaveTextContent("Fluido: 0Denso: 0Atasco: 1Incidencias: 2");
+    expect(screen.getByRole("heading", { name: "Incidencias ahora" })).toBeInTheDocument();
+    expect(screen.getByText("Obras · Vía cortada")).toBeInTheDocument();
+  });
+
+  it("says when there are no incidents and hides them when the DGT is down", async () => {
+    vi.mocked(getNetworkNow).mockResolvedValue(network);
+    vi.mocked(getIncidents).mockResolvedValue({ ...INCIDENTS, incidents: [] });
+    const { unmount } = render((await NetworkMap())!);
+    expect(screen.getByText(/Sin incidencias comunicadas/)).toBeInTheDocument();
+    unmount();
+
+    vi.mocked(getIncidents).mockResolvedValue({ ...INCIDENTS, available: false });
+    render((await NetworkMap())!);
+    expect(screen.queryByRole("heading", { name: "Incidencias ahora" })).not.toBeInTheDocument();
+    expect(screen.getByRole("list", { name: "Leyenda" })).not.toHaveTextContent("Incidencias");
     expect(screen.getAllByRole("link", { name: /Los Cristianos/ })[0]).toHaveAttribute(
       "href",
       "/prediccion?estacion=57%3A1",

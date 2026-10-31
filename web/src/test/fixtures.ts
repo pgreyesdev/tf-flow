@@ -1,4 +1,11 @@
-import type { DayForecast, HourlyForecast, Level, ModelInfo, Station } from "@/lib/api/schemas";
+import type {
+  DayForecast,
+  HourlyForecast,
+  IncidentsNow,
+  Level,
+  ModelInfo,
+  Station,
+} from "@/lib/api/schemas";
 
 export const STATIONS: Station[] = [
   { station_id: 57, direction: 1, direction_label: "creciente", name: "Los Cristianos" },
@@ -48,3 +55,38 @@ export function dayForecast(date = "2026-10-27", station: Station = STATIONS[0]!
     worst_hour: hours[8]!,
   };
 }
+
+/** Obras en la TF-82 y un accidente en la TF-5 junto a Los Cristianos (28.05, -16.71). */
+export const INCIDENTS: IncidentsNow = {
+  available: true,
+  updated: "2026-10-27T08:30:00+00:00",
+  source: "DGT · Punto de Acceso Nacional (DATEX II)",
+  incidents: [
+    {
+      id: "1",
+      kind: "accident",
+      label: "Accidente",
+      details: [],
+      road: "TF-1",
+      kilometer: 72,
+      municipality: "Arona",
+      latitude: 28.06,
+      longitude: -16.7,
+      start: "2026-10-27T07:50:00+00:00",
+      end: null,
+    },
+    {
+      id: "17264754",
+      kind: "works",
+      label: "Obras",
+      details: ["Vía cortada"],
+      road: "TF-82",
+      kilometer: 9.5,
+      municipality: "El Tanque",
+      latitude: 28.352394,
+      longitude: -16.780691,
+      start: "2026-06-22T09:06:00+00:00",
+      end: "2027-03-10T23:00:00+00:00",
+    },
+  ],
+};
