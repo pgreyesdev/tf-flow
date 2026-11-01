@@ -10,6 +10,8 @@ La API sirve las previsiones del modelo final. Todas las rutas cuelgan de `/api/
 | `GET /stations/{id}/forecast?direction=1&date=AAAA-MM-DD` | Previsión hora a hora de un día |
 | `GET /network/now` | Previsión de la hora actual en las estaciones con coordenadas, para el mapa |
 | `GET /incidents` | Incidencias de tráfico activas en Tenerife según la DGT ([ADR 0011](adr/0011-incidencias-dgt.md)) |
+| `GET /places` | Lugares que se pueden usar como origen o destino de una ruta |
+| `GET /routes?origin=…&destination=…&date=AAAA-MM-DD&hour=8` | Rutas alternativas con la previsión de sus aforos y las incidencias ([ADR 0012](adr/0012-rutas-alternativas.md)) |
 | `GET /model` | Último dato con el que se entrenó, umbral de aviso y métricas en test |
 | `POST /assistant/chat` | Respuesta del asistente conversacional ([ADR 0009](adr/0009-asistente-openai.md)) |
 

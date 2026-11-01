@@ -24,6 +24,7 @@ from tf_flow_api.services.assistant import (
 )
 from tf_flow_api.services.forecast import ForecastService
 from tf_flow_api.services.incidents import IncidentService
+from tf_flow_api.services.routes import RouteService
 
 pytestmark = pytest.mark.anyio
 
@@ -100,11 +101,14 @@ def service(
     fake: FakeResponses,
     budget: int = 10_000,
     incidents: IncidentService | None = None,
+    routes: RouteService | None = None,
 ) -> AssistantService:
+    incidents = incidents or IncidentService(fetch=_no_feed)
     return AssistantService(
         cast(AsyncResponses, fake),
         forecast,
-        incidents or IncidentService(fetch=_no_feed),
+        incidents,
+        routes or RouteService(forecast, incidents, fetch=_no_router),
         model="gpt-5.4-mini",
         effort="low",
         budget=TokenBudget(budget, today=lambda: dt.date(2025, 6, 2)),
@@ -112,6 +116,10 @@ def service(
 
 
 async def _no_feed(url: str) -> bytes:
+    raise httpx.ConnectError("sin red en los tests")
+
+
+async def _no_router(url: str, origin: Any, destination: Any) -> dict[str, Any]:
     raise httpx.ConnectError("sin red en los tests")
 
 
@@ -350,10 +358,11 @@ def test_build_assistant_needs_key_and_model(forecast: ForecastService) -> None:
     with_key = Settings(environment=Environment.TEST, openai_api_key=SecretStr("sk-test"))
 
     incidents = IncidentService(fetch=_no_feed)
+    routes = RouteService(forecast, incidents)
 
-    assert build_assistant(keyless, forecast, incidents) is None
-    assert build_assistant(with_key, None, incidents) is None
-    assert isinstance(build_assistant(with_key, forecast, incidents), AssistantService)
+    assert build_assistant(keyless, forecast, incidents, routes) is None
+    assert build_assistant(with_key, None, incidents, None) is None
+    assert isinstance(build_assistant(with_key, forecast, incidents, routes), AssistantService)
 
 
 async def test_reports_live_incidents(
@@ -381,3 +390,45 @@ async def test_says_when_incidents_are_unavailable(forecast: ForecastService) ->
     await service(forecast, fake).reply(ASK)
 
     assert tool_output(fake.calls[1]).startswith("ERROR")
+
+
+async def test_plans_routes_with_a_link_to_the_map(
+    forecast: ForecastService, incidents: IncidentService, routes: RouteService
+) -> None:
+    fake = FakeResponses(
+        tool_call(
+            "plan_route", {"origin": "Madrid", "destination": "La Laguna", "date": "", "hour": None}
+        ),
+        tool_call(
+            "plan_route", {"origin": "La Laguna", "destination": "laguna", "date": "", "hour": 8}
+        ),
+        tool_call(
+            "plan_route",
+            {"origin": "santa cruz", "destination": "la laguna", "date": "", "hour": 8},
+        ),
+        tool_call(
+            "plan_route",
+            {
+                "origin": "santa cruz",
+                "destination": "la laguna",
+                "date": "2026-01-01",
+                "hour": None,
+            },
+        ),
+        text("Ve por la TF-5."),
+    )
+
+    await service(forecast, fake, incidents=incidents, routes=routes).reply(ASK)
+
+    assert tool_output(fake.calls[1]).startswith("ERROR: no conozco el lugar «Madrid»")
+    assert tool_output(fake.calls[2]) == "ERROR: el origen y el destino son el mismo lugar"
+    plan = json.loads(tool_output(fake.calls[3]))
+    assert plan["origen"] == "Santa Cruz de Tenerife"
+    assert plan["rutas"][0]["recomendada"] is True
+    assert plan["rutas"][0]["aforos"][0][0] == "Autopista Norte"
+    assert plan["rutas"][0]["incidencias"][0]["via"] == "TF-5"
+    assert plan["enlace_mapa"] == (
+        "/rutas?origen=santa-cruz-de-tenerife&destino=san-cristobal-de-la-laguna"
+        "&fecha=2025-06-02&hora=8"
+    )
+    assert tool_output(fake.calls[4]).startswith("ERROR: Solo se planifican rutas")

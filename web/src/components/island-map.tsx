@@ -17,7 +17,7 @@ import { LEVEL_INFO } from "@/lib/levels";
 import type { MapPoint } from "@/lib/map";
 
 /** Los mismos colores que el resto de la web (globals.css). WebGL no lee variables CSS. */
-const LEVEL_COLORS: Record<Level, string> = {
+export const LEVEL_COLORS: Record<Level, string> = {
   low: "#4ade80",
   medium: "#fbbf24",
   high: "#fb7185",

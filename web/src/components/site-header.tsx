@@ -4,6 +4,7 @@ import { Logo } from "./logo";
 
 const NAV = [
   { href: "/prediccion", label: "Previsión" },
+  { href: "/rutas", label: "Rutas" },
   { href: "/asistente", label: "Asistente" },
   { href: "/metodologia", label: "Cómo funciona" },
   { href: "/#app", label: "App" },

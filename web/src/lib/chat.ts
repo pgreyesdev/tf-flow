@@ -19,5 +19,6 @@ export const TOOL_LABELS: Record<string, string> = {
   find_stations: "buscó estaciones",
   get_day_forecast: "consultó la previsión",
   get_incidents: "consultó las incidencias",
+  plan_route: "buscó rutas",
   get_model_info: "revisó el modelo",
 };

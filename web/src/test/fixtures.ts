@@ -4,6 +4,7 @@ import type {
   IncidentsNow,
   Level,
   ModelInfo,
+  RoutePlan,
   Station,
 } from "@/lib/api/schemas";
 
@@ -87,6 +88,77 @@ export const INCIDENTS: IncidentsNow = {
       longitude: -16.780691,
       start: "2026-06-22T09:06:00+00:00",
       end: "2027-03-10T23:00:00+00:00",
+    },
+  ],
+};
+
+/** Santa Cruz a La Laguna: la TF-5 directa con un atasco y un accidente, y un rodeo sin aforos. */
+export const ROUTE_PLAN: RoutePlan = {
+  origin: {
+    id: "santa-cruz-de-tenerife",
+    name: "Santa Cruz de Tenerife",
+    latitude: 28.4636,
+    longitude: -16.2518,
+  },
+  destination: {
+    id: "san-cristobal-de-la-laguna",
+    name: "San Cristóbal de La Laguna",
+    latitude: 28.4874,
+    longitude: -16.3159,
+  },
+  departure: "2026-10-27T08:00:00",
+  source: "© OpenStreetMap · rutas con OSRM",
+  routes: [
+    {
+      name: "Por TF-5",
+      roads: ["TF-5"],
+      distance_km: 12.3,
+      duration_minutes: 15,
+      geometry: [
+        [-16.2518, 28.4636],
+        [-16.2736, 28.4483],
+        [-16.3159, 28.4874],
+      ],
+      stations: [
+        {
+          station_id: 1,
+          name: "Autopista Norte",
+          latitude: 28.4483,
+          longitude: -16.2736,
+          passing: "2026-10-27T08:04:00",
+          level: "high",
+          probability_high: 0.81,
+        },
+        {
+          station_id: 3,
+          name: "Guamasa",
+          latitude: 28.48,
+          longitude: -16.3,
+          passing: "2026-10-27T08:10:00",
+          level: "medium",
+          probability_high: 0.3,
+        },
+      ],
+      incidents: [INCIDENTS.incidents[0]!],
+      closed: false,
+      score_minutes: 31,
+      recommended: true,
+    },
+    {
+      name: "Por TF-11 y TF-12",
+      roads: ["TF-11", "TF-12"],
+      distance_km: 15.8,
+      duration_minutes: 21,
+      geometry: [
+        [-16.2518, 28.4636],
+        [-16.26, 28.5],
+        [-16.3159, 28.4874],
+      ],
+      stations: [],
+      incidents: [],
+      closed: false,
+      score_minutes: 21,
+      recommended: false,
     },
   ],
 };

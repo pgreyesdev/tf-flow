@@ -88,6 +88,48 @@ export const incidentsNowSchema = z.object({
 });
 export type IncidentsNow = z.infer<typeof incidentsNowSchema>;
 
+export const placeSchema = z.object({
+  id: z.string().regex(/^[a-z0-9-]+$/),
+  name: z.string(),
+  latitude: z.number().min(-90).max(90),
+  longitude: z.number().min(-180).max(180),
+});
+export type Place = z.infer<typeof placeSchema>;
+
+export const routeStationSchema = z.object({
+  station_id: z.number().int().positive(),
+  name: z.string(),
+  latitude: z.number(),
+  longitude: z.number(),
+  passing: localDateTime,
+  level: levelSchema,
+  probability_high: z.number().min(0).max(1),
+});
+export type RouteStation = z.infer<typeof routeStationSchema>;
+
+export const routeOptionSchema = z.object({
+  name: z.string(),
+  roads: z.array(z.string()),
+  distance_km: z.number().nonnegative(),
+  duration_minutes: z.number().nonnegative(),
+  geometry: z.array(z.tuple([z.number(), z.number()])).min(2),
+  stations: z.array(routeStationSchema),
+  incidents: z.array(incidentSchema),
+  closed: z.boolean(),
+  score_minutes: z.number(),
+  recommended: z.boolean(),
+});
+export type RouteOption = z.infer<typeof routeOptionSchema>;
+
+export const routePlanSchema = z.object({
+  origin: placeSchema,
+  destination: placeSchema,
+  departure: localDateTime,
+  source: z.string(),
+  routes: z.array(routeOptionSchema),
+});
+export type RoutePlan = z.infer<typeof routePlanSchema>;
+
 export const modelInfoSchema = z.object({
   data_until: localDateTime,
   high_threshold: z.number(),

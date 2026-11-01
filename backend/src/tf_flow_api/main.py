@@ -18,6 +18,7 @@ from tf_flow_api.core.security import add_security_headers
 from tf_flow_api.services.assistant import AssistantService, TokenBudget
 from tf_flow_api.services.forecast import ForecastService
 from tf_flow_api.services.incidents import IncidentService
+from tf_flow_api.services.routes import RouteService
 from tf_flow_ml.serving.bundle import load_bundle
 from tf_flow_ml.serving.predictor import Predictor
 
@@ -42,16 +43,20 @@ def load_forecast_service(settings: Settings) -> ForecastService | None:
 
 
 def build_assistant(
-    settings: Settings, forecast: ForecastService | None, incidents: IncidentService
+    settings: Settings,
+    forecast: ForecastService | None,
+    incidents: IncidentService,
+    routes: RouteService | None,
 ) -> AssistantService | None:
     """El asistente necesita la clave de OpenAI y el modelo de previsión."""
-    if settings.openai_api_key is None or forecast is None:
+    if settings.openai_api_key is None or forecast is None or routes is None:
         return None
     client = AsyncOpenAI(api_key=settings.openai_api_key.get_secret_value(), timeout=60)
     return AssistantService(
         client.responses,
         forecast,
         incidents,
+        routes,
         model=settings.assistant_model,
         effort=settings.assistant_effort,
         budget=TokenBudget(settings.assistant_daily_token_budget),
@@ -76,8 +81,13 @@ def create_app(
             settings.incidents_feed_url,
             dt.timedelta(seconds=settings.incidents_refresh_seconds),
         )
+        app.state.routes = (
+            RouteService(app.state.forecast, app.state.incidents, settings.routing_url)
+            if app.state.forecast is not None
+            else None
+        )
         app.state.assistant = assistant or build_assistant(
-            settings, app.state.forecast, app.state.incidents
+            settings, app.state.forecast, app.state.incidents, app.state.routes
         )
         app.state.assistant_limiter = RateLimiter(settings.assistant_rate_limit_per_minute)
         yield

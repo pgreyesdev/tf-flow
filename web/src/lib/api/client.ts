@@ -18,6 +18,10 @@ import {
   modelInfoSchema,
   type NetworkNow,
   networkNowSchema,
+  type Place,
+  placeSchema,
+  type RoutePlan,
+  routePlanSchema,
   type Station,
   stationSchema,
 } from "./schemas";
@@ -111,6 +115,35 @@ export function getIncidents(): Promise<IncidentsNow> {
     incidentsNowSchema,
     { next: { revalidate: INCIDENTS_REVALIDATE_SECONDS } },
     READ_TIMEOUT_MS,
+  );
+}
+
+/** Lugares que se pueden usar como origen o destino. Cambian solo con una versión nueva. */
+export function getPlaces(): Promise<Place[]> {
+  return request("/api/v1/places", placeSchema.array(), cached, READ_TIMEOUT_MS);
+}
+
+export interface RouteQuery {
+  origin: string;
+  destination: string;
+  date?: string;
+  hour?: number;
+}
+
+/** Rutas entre dos lugares. Llevan las incidencias del momento: se reutilizan poco tiempo. */
+export function getRoutes({ origin, destination, date, hour }: RouteQuery): Promise<RoutePlan> {
+  const query = new URLSearchParams({ origin, destination });
+  if (date) {
+    query.set("date", date);
+  }
+  if (hour !== undefined) {
+    query.set("hour", String(hour));
+  }
+  return request(
+    `/api/v1/routes?${query.toString()}`,
+    routePlanSchema,
+    { next: { revalidate: INCIDENTS_REVALIDATE_SECONDS } },
+    FORECAST_TIMEOUT_MS,
   );
 }
 

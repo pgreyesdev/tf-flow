@@ -13,7 +13,7 @@ describe("site chrome", () => {
   it("links every section", () => {
     render(<SiteHeader />);
     const nav = screen.getByRole("navigation", { name: "Principal" });
-    expect(nav).toHaveTextContent("PrevisiónAsistenteCómo funcionaApp");
+    expect(nav).toHaveTextContent("PrevisiónRutasAsistenteCómo funcionaApp");
     expect(screen.getByRole("link", { name: "TF-FLOW, inicio" })).toHaveAttribute("href", "/");
   });
 

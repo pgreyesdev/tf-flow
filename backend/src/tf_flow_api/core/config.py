@@ -30,6 +30,8 @@ class Settings(BaseSettings):
     """Incidencias en directo de la DGT (DATEX II v3.6)."""
     incidents_refresh_seconds: int = Field(default=300, ge=60)
     """Cada cuánto se vuelve a leer como mucho la DGT: el fichero es de toda España."""
+    routing_url: str = "https://router.project-osrm.org"
+    """Servidor OSRM con el mapa de OpenStreetMap para calcular rutas."""
     rate_limit_per_minute: int = Field(default=60, ge=1)
     """Peticiones por minuto y cliente; ``/health`` no cuenta."""
 

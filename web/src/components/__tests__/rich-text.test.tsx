@@ -33,4 +33,17 @@ describe("RichText", () => {
     const { container } = render(<RichText text="3 * 4 = 12" />);
     expect(container.querySelector("em")).toBeNull();
   });
+
+  it("links only to pages of the site", () => {
+    render(
+      <RichText
+        text={"[Ver las rutas en el mapa](/rutas?origen=a&destino=b) y [otra](//malo.example)"}
+      />,
+    );
+    expect(screen.getByRole("link", { name: "Ver las rutas en el mapa" })).toHaveAttribute(
+      "href",
+      "/rutas?origen=a&destino=b",
+    );
+    expect(screen.queryByRole("link", { name: "otra" })).not.toBeInTheDocument();
+  });
 });

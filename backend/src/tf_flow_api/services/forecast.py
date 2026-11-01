@@ -153,6 +153,12 @@ class ForecastService:
         ]
         return NetworkNow(time=moment, stations=stations)
 
+    def hour_forecast(self, station: Station, moment: dt.datetime) -> HourlyForecast:
+        """La previsión de una sola hora: con las precalculadas es leerla."""
+        timestamp = pd.Timestamp(moment.replace(minute=0, second=0, microsecond=0, tzinfo=None))
+        predicted = self.predictor.predict(station.station_id, station.direction, [timestamp])
+        return _hourly(predicted[0])
+
     def model_info(self) -> ModelInfo:
         bundle = self.predictor.bundle
         return ModelInfo(

@@ -24,6 +24,11 @@ export function SiteFooter() {
               </Link>
             </li>
             <li>
+              <Link className={link} href="/rutas">
+                Rutas
+              </Link>
+            </li>
+            <li>
               <Link className={link} href="/asistente">
                 Asistente
               </Link>

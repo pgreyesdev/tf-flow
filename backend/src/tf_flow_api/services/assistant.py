@@ -10,11 +10,12 @@ import logging
 import unicodedata
 from collections.abc import Callable
 from typing import Any, Literal, cast
+from urllib.parse import urlencode
 
 import openai
 from openai.resources.responses import AsyncResponses
 from openai.types.responses import FunctionToolParam, Response, ResponseInputItemParam
-from pydantic import BaseModel, Field, ValidationError
+from pydantic import BaseModel, Field, ValidationError, field_validator
 
 from tf_flow_api.domain.chat import ChatMessage, ChatReply
 from tf_flow_api.services.forecast import (
@@ -24,6 +25,8 @@ from tf_flow_api.services.forecast import (
     today_in_tenerife,
 )
 from tf_flow_api.services.incidents import IncidentService
+from tf_flow_api.services.places import PLACES, find_place
+from tf_flow_api.services.routes import RouteService, RoutingUnavailableError
 
 logger = logging.getLogger(__name__)
 
@@ -47,6 +50,11 @@ que des la previsión de hoy o de los próximos días para una vía, consulta ta
 de la DGT en esa vía. Si hay alguna, empieza la respuesta avisando de ella (qué es, dónde y desde \
 cuándo) y recuerda que la previsión no la tiene en cuenta. Los niveles son low (fluido), medium \
 (denso) y high (atasco fuerte). Las horas son locales de Canarias.
+
+Si preguntan cómo ir de un sitio a otro o por una alternativa a una vía, usa plan_route. Explica \
+cuál recomiendas y por qué (atascos previstos en sus aforos, incidencias, tiempo), recuerda que \
+solo se conoce el tráfico donde hay estación de aforo y termina con el enlace al mapa así: \
+[Ver las rutas en el mapa](enlace_mapa).
 
 Si te preguntan algo que no tiene que ver con el tráfico de Tenerife, dilo con amabilidad y \
 reconduce la conversación."""
@@ -96,6 +104,22 @@ TOOLS: list[FunctionToolParam] = [
         {"road": {"type": "string", "description": "Vía, como 'TF-1', o vacío"}},
     ),
     _tool(
+        "plan_route",
+        "Rutas en coche entre dos lugares de Tenerife (municipios y destinos como 'Aeropuerto "
+        "Tenerife Sur' o 'Los Cristianos'), de la más recomendable a la menos. De cada ruta da "
+        "km, minutos sin tráfico, los aforos que cruza con su nivel previsto a la hora de paso, "
+        "las incidencias de la DGT encima y un enlace al mapa con las rutas.",
+        {
+            "origin": {"type": "string", "description": "Lugar de salida"},
+            "destination": {"type": "string", "description": "Lugar de llegada"},
+            "date": {"type": "string", "description": "Fecha AAAA-MM-DD, o vacío para hoy"},
+            "hour": {
+                "type": ["integer", "null"],
+                "description": "Hora de salida de 0 a 23, o null para ahora",
+            },
+        },
+    ),
+    _tool(
         "get_model_info",
         "Hasta qué fecha llegan los datos del modelo y qué precisión tuvo en el periodo de test.",
         {},
@@ -109,6 +133,18 @@ class _FindStations(BaseModel):
 
 class _Incidents(BaseModel):
     road: str = Field(default="", max_length=20)
+
+
+class _PlanRoute(BaseModel):
+    origin: str = Field(max_length=80)
+    destination: str = Field(max_length=80)
+    date: dt.date | None = None
+    hour: int | None = Field(default=None, ge=0, le=23)
+
+    @field_validator("date", mode="before")
+    @classmethod
+    def _empty_is_today(cls, value: object) -> object:
+        return None if value == "" else value
 
 
 class _DayForecast(BaseModel):
@@ -172,6 +208,7 @@ class AssistantService:
         responses: AsyncResponses,
         forecast: ForecastService,
         incidents: IncidentService,
+        routes: RouteService,
         *,
         model: str,
         effort: Effort,
@@ -180,6 +217,7 @@ class AssistantService:
         self.responses = responses
         self.forecast = forecast
         self.incidents = incidents
+        self.routes = routes
         self.model = model
         self.effort = effort
         self.budget = budget
@@ -271,6 +309,8 @@ class AssistantService:
                     output = self._forecast_summary(_DayForecast.model_validate(arguments))
                 case "get_incidents":
                     output = await self._incidents_summary(_Incidents.model_validate(arguments))
+                case "plan_route":
+                    output = await self._route_summary(_PlanRoute.model_validate(arguments))
                 case "get_model_info":
                     output = self.forecast.model_info().model_dump_json()
                 case _:
@@ -278,13 +318,52 @@ class AssistantService:
             return output
         except (json.JSONDecodeError, ValidationError) as error:
             return f"ERROR: argumentos no válidos ({error})"
-        except (StationNotFoundError, DateOutOfRangeError) as error:
+        except (StationNotFoundError, DateOutOfRangeError, RoutingUnavailableError) as error:
             return f"ERROR: {error}"
 
     def _find_stations(self, request: _FindStations) -> str:
         query = _fold(request.query)
         found = [s.model_dump() for s in self.forecast.stations() if query in _fold(s.name)]
         return json.dumps(found[:40], ensure_ascii=False)
+
+    async def _route_summary(self, request: _PlanRoute) -> str:
+        origin, destination = find_place(request.origin), find_place(request.destination)
+        if origin is None or destination is None:
+            missing = request.origin if origin is None else request.destination
+            names = ", ".join(p.name for p in PLACES)
+            return f"ERROR: no conozco el lugar «{missing}». Lugares disponibles: {names}"
+        if origin.id == destination.id:
+            return "ERROR: el origen y el destino son el mismo lugar"
+        departure = self.routes.departure(request.date, request.hour)
+        plan = await self.routes.plan(origin, destination, departure)
+        query = {"origen": origin.id, "destino": destination.id}
+        query |= {"fecha": departure.date().isoformat(), "hora": str(departure.hour)}
+        summary = {
+            "origen": origin.name,
+            "destino": destination.name,
+            "salida": departure.isoformat(timespec="minutes"),
+            "rutas": [
+                {
+                    "nombre": route.name,
+                    "recomendada": route.recommended,
+                    "km": route.distance_km,
+                    "minutos_sin_trafico": round(route.duration_minutes),
+                    "via_cortada": route.closed,
+                    "aforos": [
+                        [s.name, s.passing.strftime("%H:%M"), s.level.value, s.probability_high]
+                        for s in route.stations
+                    ],
+                    "incidencias": [
+                        {"tipo": i.label, "efectos": i.details, "via": i.road, "km": i.kilometer}
+                        for i in route.incidents
+                    ],
+                }
+                for route in plan.routes
+            ],
+            "formato_aforos": ["nombre", "hora_paso", "nivel", "prob_atasco_fuerte"],
+            "enlace_mapa": f"/rutas?{urlencode(query)}",
+        }
+        return json.dumps(summary, ensure_ascii=False)
 
     async def _incidents_summary(self, request: _Incidents) -> str:
         now = await self.incidents.current()

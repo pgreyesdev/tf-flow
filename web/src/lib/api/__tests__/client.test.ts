@@ -4,11 +4,13 @@ import {
   getDayForecast,
   getModelInfo,
   getIncidents,
+  getPlaces,
+  getRoutes,
   getNetworkNow,
   getStations,
 } from "@/lib/api/client";
 import { getHomeData } from "@/lib/api/featured";
-import { dayForecast, INCIDENTS, MODEL, STATIONS } from "@/test/fixtures";
+import { dayForecast, INCIDENTS, MODEL, ROUTE_PLAN, STATIONS } from "@/test/fixtures";
 
 function json(body: unknown, status = 200, headers: Record<string, string> = {}) {
   return new Response(JSON.stringify(body), {
@@ -68,6 +70,23 @@ describe("API client", () => {
     const fetchMock = mockFetch(() => json(network));
     await expect(getNetworkNow()).resolves.toEqual(network);
     expect(String(fetchMock.mock.calls[0]![0])).toBe("http://api.test/api/v1/network/now");
+  });
+
+  it("reads the places and the routes between two of them", async () => {
+    const places = [ROUTE_PLAN.origin];
+    let fetchMock = mockFetch(() => json(places));
+    await expect(getPlaces()).resolves.toEqual(places);
+    expect(String(fetchMock.mock.calls[0]![0])).toBe("http://api.test/api/v1/places");
+
+    fetchMock = mockFetch(() => json(ROUTE_PLAN));
+    await expect(getRoutes({ origin: "a", destination: "b" })).resolves.toEqual(ROUTE_PLAN);
+    await getRoutes({ origin: "a", destination: "b", date: "2026-10-28", hour: 0 });
+    expect(String(fetchMock.mock.calls[0]![0])).toBe(
+      "http://api.test/api/v1/routes?origin=a&destination=b",
+    );
+    expect(String(fetchMock.mock.calls[1]![0])).toBe(
+      "http://api.test/api/v1/routes?origin=a&destination=b&date=2026-10-28&hour=0",
+    );
   });
 
   it("reads the live incidents", async () => {

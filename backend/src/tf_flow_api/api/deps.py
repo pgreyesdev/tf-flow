@@ -11,6 +11,7 @@ from tf_flow_api.core.rate_limit import RateLimiter
 from tf_flow_api.services.assistant import AssistantService
 from tf_flow_api.services.forecast import ForecastService
 from tf_flow_api.services.incidents import IncidentService
+from tf_flow_api.services.routes import RouteService
 
 
 def app_settings(request: Request) -> Settings:
@@ -27,6 +28,13 @@ def forecast_service(request: Request) -> ForecastService:
 
 def incident_service(request: Request) -> IncidentService:
     return cast(IncidentService, request.app.state.incidents)
+
+
+def route_service(request: Request) -> RouteService:
+    service = cast(RouteService | None, request.app.state.routes)
+    if service is None:
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "El modelo no está cargado")
+    return service
 
 
 def assistant_service(
@@ -57,4 +65,5 @@ def assistant_service(
 SettingsDep = Annotated[Settings, Depends(app_settings)]
 ForecastDep = Annotated[ForecastService, Depends(forecast_service)]
 IncidentDep = Annotated[IncidentService, Depends(incident_service)]
+RouteDep = Annotated[RouteService, Depends(route_service)]
 AssistantDep = Annotated[AssistantService, Depends(assistant_service)]

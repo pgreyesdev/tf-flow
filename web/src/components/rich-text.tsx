@@ -1,8 +1,10 @@
+import type { Route } from "next";
+import Link from "next/link";
 import { Fragment, type ReactNode } from "react";
 
 /**
  * Pinta el Markdown sencillo que devuelve el asistente: párrafos, listas, **negrita**, *cursiva* y
- * `código`. Se construyen nodos de React a partir del texto, nunca HTML, así que nada de lo que
+ * `código`, y enlaces a páginas de la propia web como `[Ver las rutas](/rutas?...)`. Se construyen nodos de React a partir del texto, nunca HTML, así que nada de lo que
  * escriba el modelo puede inyectar marcado.
  */
 type Block =
@@ -11,7 +13,10 @@ type Block =
 const BULLET = /^\s*[-*•]\s+(.*)$/;
 const NUMBERED = /^\s*\d+[.)]\s+(.*)$/;
 const HEADING = /^\s*#{1,6}\s+(.*)$/;
-const INLINE = /(\*\*[^*]+\*\*|__[^_]+__|\*[^*\s][^*]*\*|_[^_\s][^_]*_|`[^`]+`)/g;
+const INLINE =
+  /(\[[^\]]+\]\(\/[^)\s]*\)|\*\*[^*]+\*\*|__[^_]+__|\*[^*\s][^*]*\*|_[^_\s][^_]*_|`[^`]+`)/g;
+/** Solo enlaces internos: empiezan por una barra y no por dos (eso sería otro dominio). */
+const LINK = /^\[([^\]]+)\]\((\/(?!\/)[^)\s]*)\)$/;
 
 export function parseBlocks(text: string): Block[] {
   const blocks: Block[] = [];
@@ -45,6 +50,14 @@ export function parseBlocks(text: string): Block[] {
 
 function inline(text: string): ReactNode[] {
   return text.split(INLINE).map((part, i) => {
+    const link = LINK.exec(part);
+    if (link) {
+      return (
+        <Link key={i} href={link[2] as Route} className="font-semibold text-accent underline">
+          {link[1]}
+        </Link>
+      );
+    }
     if (/^(\*\*|__).+\1$/.test(part)) {
       return <strong key={i}>{part.slice(2, -2)}</strong>;
     }

@@ -1,3 +1,4 @@
+import copy
 import datetime as dt
 from collections.abc import Iterator
 from pathlib import Path
@@ -9,9 +10,11 @@ import pytest
 from fastapi.testclient import TestClient
 
 from tf_flow_api.core.config import Environment, Settings
+from tf_flow_api.domain.routes import Place
 from tf_flow_api.main import create_app
 from tf_flow_api.services.forecast import ForecastService
 from tf_flow_api.services.incidents import IncidentService
+from tf_flow_api.services.routes import RouteService
 from tf_flow_ml.processing.aggregation import BIN_COLUMNS, add_calendar_features
 from tf_flow_ml.serving.bundle import ServingBundle, build_bundle
 from tf_flow_ml.serving.predictor import Predictor
@@ -91,3 +94,36 @@ def client(
 def client_without_model(settings: Settings, incidents: IncidentService) -> Iterator[TestClient]:
     with TestClient(create_app(settings, incidents=incidents)) as test_client:
         yield test_client
+
+
+SANTA_CRUZ, LA_LAGUNA = (-16.2518, 28.4636), (-16.3159, 28.4874)
+STATION_1 = (-16.2736395, 28.4483194)
+ACCIDENT_TF5 = (-16.3122, 28.4791)
+
+
+def osrm_route(points: list[tuple[float, float]], minutes: float, km: float, summary: str) -> dict:
+    return {
+        "geometry": {"type": "LineString", "coordinates": [list(p) for p in points]},
+        "legs": [{"summary": summary, "distance": km * 1000, "duration": minutes * 60}],
+        "distance": km * 1000,
+        "duration": minutes * 60,
+    }
+
+
+#: Dos rutas de Santa Cruz a La Laguna: la directa pasa por la estación 1 y por el accidente de la
+#: TF-5 de la muestra de la DGT; la otra da un rodeo por el norte sin aforos.
+OSRM_RESPONSE = {
+    "code": "Ok",
+    "routes": [
+        osrm_route([SANTA_CRUZ, STATION_1, ACCIDENT_TF5, LA_LAGUNA], 15, 12.3, "TF-5"),
+        osrm_route([SANTA_CRUZ, (-16.26, 28.5), LA_LAGUNA], 21, 15.8, "TF-11, TF-12"),
+    ],
+}
+
+
+@pytest.fixture
+def routes(forecast: ForecastService, incidents: IncidentService) -> RouteService:
+    async def fetch(url: str, origin: Place, destination: Place) -> dict:
+        return copy.deepcopy(OSRM_RESPONSE)
+
+    return RouteService(forecast, incidents, "https://osrm.example", fetch, now=lambda: NOW)
