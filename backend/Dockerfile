@@ -1,5 +1,5 @@
 # Imagen de la API: compilación con uv y ejecución como usuario sin privilegios.
-FROM python:3.12-slim AS builder
+FROM python:3.15-slim AS builder
 COPY --from=ghcr.io/astral-sh/uv:0.5 /uv /usr/local/bin/uv
 WORKDIR /app
 ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy
@@ -8,7 +8,7 @@ COPY backend ./backend
 COPY ml ./ml
 RUN uv sync --frozen --no-dev --package tf-flow-api
 
-FROM python:3.12-slim
+FROM python:3.15-slim
 # LightGBM necesita la biblioteca de OpenMP en tiempo de ejecución.
 RUN apt-get update \
     && apt-get install -y --no-install-recommends libgomp1 \
