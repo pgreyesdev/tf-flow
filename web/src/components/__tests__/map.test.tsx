@@ -4,7 +4,7 @@ import { IslandMap } from "@/components/island-map";
 import { NearbyIncidents } from "@/components/incidents";
 import { NetworkMap, NetworkMapSkeleton } from "@/components/network-map";
 import { getIncidents, getNetworkNow } from "@/lib/api/client";
-import type { NetworkNow } from "@/lib/api/schemas";
+import type { NetworkNow, Station } from "@/lib/api/schemas";
 import type { MapPoint } from "@/lib/map";
 import { hourly, INCIDENTS, STATIONS } from "@/test/fixtures";
 
@@ -111,7 +111,9 @@ describe("IslandMap", () => {
     expect(maplibre.popup.content).toBeUndefined();
     maplibre.handlers.get("click:stations")!({ features: [{ properties: { stationId: 57 } }] });
     const popup = maplibre.popup.content!;
-    expect(popup).toHaveTextContent("Los CristianosAtasco · 87 % de riesgo de atasco");
+    expect(popup).toHaveTextContent(
+      "Los CristianosAtasco · 87 % de riesgo de atasco⚠ Cerca: Accidente en la TF-1Ver la previsión",
+    );
     expect(within(popup).getByRole("link")).toHaveAttribute("href", "/prediccion?estacion=57%3A1");
 
     maplibre.handlers.get("mouseenter:incidents")!();
@@ -152,28 +154,60 @@ describe("IslandMap", () => {
 
 describe("NearbyIncidents", () => {
   const station = { ...STATIONS[0]!, latitude: 28.05, longitude: -16.71 };
+  const today = "2026-10-27";
+  const nearby = (props: Partial<{ station: Station; date: string }> = {}) =>
+    NearbyIncidents({ station, date: today, today, ...props });
 
-  it("warns about incidents near the station", async () => {
-    render((await NearbyIncidents({ station }))!);
+  it("warns about the incident on the road near the station", async () => {
+    render((await nearby())!);
     expect(
-      screen.getByRole("heading", { name: "Hay una incidencia cerca de este punto ahora mismo" }),
+      screen.getByRole("heading", { name: "Accidente en la TF-1, cerca de este punto" }),
     ).toBeInTheDocument();
-    expect(screen.getByText("Accidente")).toBeInTheDocument();
+    expect(screen.getByText("Ahora mismo, según la DGT.")).toBeInTheDocument();
     expect(screen.queryByText(/Obras/)).not.toBeInTheDocument();
   });
 
-  it("counts several incidents", async () => {
+  it("counts several incidents and keeps the works that last until another day", async () => {
     const near = INCIDENTS.incidents.map((i) => ({ ...i, latitude: 28.05, longitude: -16.71 }));
     vi.mocked(getIncidents).mockResolvedValue({ ...INCIDENTS, incidents: near });
-    render((await NearbyIncidents({ station }))!);
-    expect(screen.getByRole("heading", { name: /Hay 2 incidencias/ })).toBeInTheDocument();
+    const { unmount } = render((await nearby())!);
+    expect(
+      screen.getByRole("heading", { name: "2 incidencias cerca de este punto" }),
+    ).toBeVisible();
+    unmount();
+
+    render((await nearby({ date: "2026-11-15" }))!);
+    expect(
+      screen.getByRole("heading", { name: "Obras en la TF-82, cerca de este punto" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Según la DGT, seguirá activa ese día.")).toBeInTheDocument();
   });
 
-  it("stays quiet without coordinates, incidents or source", async () => {
-    expect(await NearbyIncidents({ station: STATIONS[0]! })).toBeNull();
-    expect(await NearbyIncidents({ station: { ...station, latitude: 28.5 } })).toBeNull();
+  it("names the incident without a road, and several that will last", async () => {
+    const [accident, works] = INCIDENTS.incidents;
+    vi.mocked(getIncidents).mockResolvedValue({
+      ...INCIDENTS,
+      incidents: [{ ...accident!, road: null }],
+    });
+    const { unmount } = render((await nearby())!);
+    expect(screen.getByRole("heading")).toHaveTextContent("Accidente cerca de este punto");
+    unmount();
+
+    const lasting = { ...works!, latitude: 28.05, longitude: -16.71 };
+    vi.mocked(getIncidents).mockResolvedValue({
+      ...INCIDENTS,
+      incidents: [lasting, { ...lasting, id: "2" }],
+    });
+    render((await nearby({ date: "2026-11-15" }))!);
+    expect(screen.getByText("Según la DGT, seguirán activas ese día.")).toBeInTheDocument();
+  });
+
+  it("stays quiet without coordinates, incidents or source, and for past days", async () => {
+    expect(await nearby({ station: STATIONS[0]! })).toBeNull();
+    expect(await nearby({ station: { ...station, latitude: 28.5 } })).toBeNull();
+    expect(await nearby({ date: "2026-10-01" })).toBeNull();
     vi.mocked(getIncidents).mockRejectedValue(new Error("caída"));
-    expect(await NearbyIncidents({ station })).toBeNull();
+    expect(await nearby()).toBeNull();
   });
 });
 
@@ -193,6 +227,7 @@ describe("NetworkMap", () => {
     expect(legend).toHaveTextContent("Fluido: 0Denso: 0Atasco: 1Incidencias: 2");
     expect(screen.getByRole("heading", { name: "Incidencias ahora" })).toBeInTheDocument();
     expect(screen.getByText("Obras · Vía cortada")).toBeInTheDocument();
+    expect(screen.getAllByRole("img", { name: "Incidencia cerca" })).toHaveLength(2);
   });
 
   it("says when there are no incidents and hides them when the DGT is down", async () => {

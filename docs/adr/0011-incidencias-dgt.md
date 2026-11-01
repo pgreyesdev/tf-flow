@@ -36,8 +36,11 @@ que se pueda usar legalmente:
 - **Si la DGT falla** se siguen sirviendo las últimas incidencias leídas durante 30 minutos; después
   la respuesta dice `available: false` y la web oculta la sección en lugar de decir que no hay nada.
 - **Dónde se usan:** capa propia en el mapa de la portada (blanco con borde naranja, distinto de los
-  tres niveles) y lista «Incidencias ahora»; aviso en la previsión de hoy si hay alguna a menos de
-  3 km de la estación; y una herramienta `get_incidents` para el asistente.
+  tres niveles), borde naranja y aviso en el globo de las estaciones con una incidencia a menos de
+  3 km, y lista «Incidencias ahora». En la previsión de una estación, un aviso destacado con la vía
+  («Obras en la TF-82, cerca de este punto»): hoy, con cualquier incidencia activa; otro día, con
+  las obras y cortes que según la DGT seguirán ese día. El asistente consulta las incidencias de la
+  vía cada vez que da una previsión y, si hay alguna, empieza avisando de ella.
 - **No entran en el modelo.** La previsión sigue siendo la del modelo entrenado; la web avisa de que
   una incidencia cercana puede hacer que haya más tráfico del previsto.
 

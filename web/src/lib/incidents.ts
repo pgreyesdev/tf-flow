@@ -43,6 +43,21 @@ export function incidentSince(incident: Incident, now: Date = new Date()): strin
     : `Desde el ${day.format(start)}`;
 }
 
+/**
+ * Si la incidencia afecta al día `date`. Hoy, todas las activas; un día futuro, solo las que según
+ * la DGT siguen ese día (obras con fecha de fin). Del pasado no se sabe nada.
+ */
+export function activeOn(incident: Incident, date: string, today: string): boolean {
+  if (date === today) {
+    return true;
+  }
+  if (date < today || !incident.end) {
+    return false;
+  }
+  const start = incident.start ? todayInTenerife(new Date(incident.start)) : today;
+  return start <= date && date <= todayInTenerife(new Date(incident.end));
+}
+
 /** Distancia en kilómetros entre dos puntos (fórmula del semiverseno). */
 export function distanceKm(
   a: { latitude: number; longitude: number },

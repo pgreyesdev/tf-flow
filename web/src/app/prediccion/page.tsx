@@ -150,9 +150,9 @@ export default async function ForecastPage({ searchParams }: PageProps<"/predicc
         </Notice>
       )}
 
-      {station && date === today && (
+      {station && (
         <Suspense fallback={null}>
-          <NearbyIncidents station={station} />
+          <NearbyIncidents station={station} date={date} today={today} />
         </Suspense>
       )}
 

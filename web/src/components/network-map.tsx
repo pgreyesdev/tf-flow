@@ -7,6 +7,7 @@ import { LEVEL_CHIP, LevelBadge, LevelIcon } from "@/components/level-badge";
 import { getNetworkNow } from "@/lib/api/client";
 import { LEVELS } from "@/lib/api/schemas";
 import { formatPercent } from "@/lib/format";
+import { incidentsNear } from "@/lib/incidents";
 import { LEVEL_INFO } from "@/lib/levels";
 import { mapPoints } from "@/lib/map";
 import { cx } from "@/lib/ui";
@@ -28,6 +29,23 @@ export async function NetworkMap() {
     return null;
   }
   const hour = network.time.slice(11, 16);
+  const withIncident = new Set(
+    points
+      .filter((p) => incidentsNear(incidents?.incidents ?? [], p).length > 0)
+      .map((p) => p.stationId),
+  );
+  const nameOf = (point: (typeof points)[number]) => (
+    <span className="flex min-w-0 items-center gap-1.5">
+      <span className="truncate">{point.name}</span>
+      {withIncident.has(point.stationId) && (
+        <TriangleAlert
+          role="img"
+          aria-label="Incidencia cerca"
+          className="size-4 shrink-0 text-incident"
+        />
+      )}
+    </span>
+  );
   const counts = Object.fromEntries(
     LEVELS.map((level) => [level, points.filter((p) => p.level === level).length]),
   );
@@ -98,7 +116,7 @@ export async function NetworkMap() {
                   href={forecastHref(point.key)}
                   className="flex items-center justify-between gap-3 rounded-xl px-2 py-1 hover:bg-glass-strong"
                 >
-                  <span className="min-w-0 truncate">{point.name}</span>
+                  {nameOf(point)}
                   <span className="shrink-0 text-ink-soft tabular">
                     {formatPercent(point.probabilityHigh)}
                   </span>
@@ -120,7 +138,7 @@ export async function NetworkMap() {
                     href={forecastHref(point.key)}
                     className="flex items-center justify-between gap-3 rounded-xl px-2 py-1 hover:bg-glass-strong"
                   >
-                    <span className="min-w-0 truncate">{point.name}</span>
+                    {nameOf(point)}
                     <LevelBadge level={point.level} />
                   </Link>
                 </li>

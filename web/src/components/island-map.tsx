@@ -12,7 +12,7 @@ import { useEffect, useRef, useState } from "react";
 
 import type { Incident, Level } from "@/lib/api/schemas";
 import { formatPercent } from "@/lib/format";
-import { incidentPlace, incidentSince, incidentTitle } from "@/lib/incidents";
+import { incidentPlace, incidentSince, incidentsNear, incidentTitle } from "@/lib/incidents";
 import { LEVEL_INFO } from "@/lib/levels";
 import type { MapPoint } from "@/lib/map";
 
@@ -98,14 +98,22 @@ const VIEW = {
   bearing: -15,
 };
 
-function asGeoJson(points: MapPoint[]): GeoJSONSourceSpecification["data"] {
+function asGeoJson(
+  points: MapPoint[],
+  nearby: Map<number, Incident[]>,
+): GeoJSONSourceSpecification["data"] {
   return {
     type: "FeatureCollection",
     features: points.map((p) => ({
       type: "Feature" as const,
       id: p.stationId,
       geometry: { type: "Point" as const, coordinates: [p.longitude, p.latitude] },
-      properties: { stationId: p.stationId, color: LEVEL_COLORS[p.level] },
+      properties: {
+        stationId: p.stationId,
+        color: LEVEL_COLORS[p.level],
+        // Las estaciones con una incidencia cerca llevan el borde naranja de las incidencias.
+        stroke: nearby.get(p.stationId)?.length ? INCIDENT_COLOR : "#050b18",
+      },
     })),
   };
 }
@@ -146,7 +154,7 @@ function incidentPopup(incident: Incident): HTMLElement {
 }
 
 /** Contenido del globo al pulsar una estación. Se construye con nodos: nada de HTML a mano. */
-function popupContent(point: MapPoint): HTMLElement {
+function popupContent(point: MapPoint, near: Incident[]): HTMLElement {
   const box = document.createElement("div");
   box.className = "space-y-1 text-night";
   const name = document.createElement("p");
@@ -158,7 +166,12 @@ function popupContent(point: MapPoint): HTMLElement {
   link.href = `/prediccion?${new URLSearchParams({ estacion: point.key }).toString()}`;
   link.className = "font-semibold text-accent-ink underline";
   link.textContent = "Ver la previsión del día";
-  box.append(name, level, link);
+  box.append(name, level);
+  for (const incident of near) {
+    const place = incident.road ? ` en la ${incident.road}` : "";
+    box.append(paragraph(`⚠ Cerca: ${incidentTitle(incident)}${place}`, "font-semibold"));
+  }
+  box.append(link);
   return box;
 }
 
@@ -183,6 +196,7 @@ export function IslandMap({
     let cancelled = false;
     const byId = new Map(points.map((p) => [p.stationId, p]));
     const incidentsById = new Map(incidents.map((i) => [i.id, i]));
+    const nearby = new Map(points.map((p) => [p.stationId, incidentsNear(incidents, p)]));
 
     void import("maplibre-gl")
       .then((maplibre) => {
@@ -226,7 +240,7 @@ export function IslandMap({
           if (!map) {
             return;
           }
-          map.addSource("stations", { type: "geojson", data: asGeoJson(points) });
+          map.addSource("stations", { type: "geojson", data: asGeoJson(points, nearby) });
           map.addLayer({
             id: "stations",
             type: "circle",
@@ -234,8 +248,8 @@ export function IslandMap({
             paint: {
               "circle-color": ["get", "color"],
               "circle-radius": ["interpolate", ["linear"], ["zoom"], 8, 4, 11, 7, 13, 10],
-              "circle-stroke-color": "#050b18",
-              "circle-stroke-width": 1.5,
+              "circle-stroke-color": ["get", "stroke"],
+              "circle-stroke-width": 2,
               "circle-pitch-alignment": "viewport",
             },
           });
@@ -271,7 +285,7 @@ export function IslandMap({
             }
             popup
               .setLngLat([point.longitude, point.latitude])
-              .setDOMContent(popupContent(point))
+              .setDOMContent(popupContent(point, nearby.get(point.stationId) ?? []))
               .addTo(map);
           });
           for (const layer of ["stations", "incidents"]) {

@@ -1,4 +1,5 @@
 import {
+  activeOn,
   distanceKm,
   incidentPlace,
   incidentSince,
@@ -28,6 +29,19 @@ describe("incidents", () => {
     expect(incidentSince(accident, now)).toBe("Desde las 07:50");
     expect(incidentSince(works, now)).toBe("Desde el 22 jun");
     expect(incidentSince({ ...works, start: null }, now)).toBeUndefined();
+  });
+
+  it("knows which incidents last until a given day", () => {
+    const today = "2026-10-27";
+    expect(activeOn(accident, today, today)).toBe(true);
+    expect(activeOn(accident, "2026-10-28", today)).toBe(false);
+    expect(activeOn(works, "2026-10-26", today)).toBe(false);
+    expect(activeOn(works, "2027-03-10", today)).toBe(true);
+    expect(activeOn(works, "2027-03-12", today)).toBe(false);
+    expect(activeOn({ ...works, start: "2026-11-02T08:00:00+00:00" }, "2026-11-01", today)).toBe(
+      false,
+    );
+    expect(activeOn({ ...works, start: null }, "2026-11-01", today)).toBe(true);
   });
 
   it("finds the incidents close to a station", () => {
