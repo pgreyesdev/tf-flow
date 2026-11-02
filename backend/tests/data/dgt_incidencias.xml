@@ -1,0 +1,247 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Muestra reducida del fichero DATEX II v3 de incidencias de la DGT (SituationPublication), con la
+  forma del fichero real y datos inventados para los tests. Con la hora de los tests (2 de junio de
+  2025, 08:30 en Canarias) quedan activas tres incidencias en Tenerife: un accidente en la TF-5,
+  un corte por obras de la TF-82 con un registro por sentido y obras en la TF-1. El resto se
+  descarta: Gran Canaria, un registro suspendido, unas obras ya terminadas y otras que aún no han
+  empezado.
+-->
+<d2:payload xmlns:d2="http://levelC/schema/3/d2Payload"
+    xmlns:com="http://levelC/schema/3/common"
+    xmlns:sit="http://levelC/schema/3/situation"
+    xmlns:loc="http://levelC/schema/3/locationReferencing"
+    xmlns:lse="http://levelC/schema/3/locationReferencingSpanishExtension"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:type="sit:SituationPublication" lang="es" modelBaseVersion="3">
+  <com:publicationTime>2025-06-02T07:25:00Z</com:publicationTime>
+  <com:publicationCreator>
+    <com:country>es</com:country>
+    <com:nationalIdentifier>DGT</com:nationalIdentifier>
+  </com:publicationCreator>
+
+  <sit:situation id="1">
+    <sit:overallSeverity>high</sit:overallSeverity>
+    <sit:situationRecord xsi:type="sit:Accident" id="1_1" version="1">
+      <sit:situationRecordCreationTime>2025-06-02T06:52:00Z</sit:situationRecordCreationTime>
+      <sit:probabilityOfOccurrence>certain</sit:probabilityOfOccurrence>
+      <sit:validity>
+        <com:validityStatus>active</com:validityStatus>
+        <com:validityTimeSpecification>
+          <com:overallStartTime>2025-06-02T06:50:00Z</com:overallStartTime>
+        </com:validityTimeSpecification>
+      </sit:validity>
+      <sit:cause>
+        <sit:causeType>accident</sit:causeType>
+      </sit:cause>
+      <sit:locationReference xsi:type="loc:SingleRoadLinearLocation">
+        <loc:supplementaryPositionalDescription>
+          <loc:roadInformation>
+            <loc:roadName>TF-5</loc:roadName>
+          </loc:roadInformation>
+        </loc:supplementaryPositionalDescription>
+        <loc:pointAlongLinearElement>
+          <loc:pointCoordinates>
+            <loc:latitude>28.4791</loc:latitude>
+            <loc:longitude>-16.3122</loc:longitude>
+          </loc:pointCoordinates>
+        </loc:pointAlongLinearElement>
+        <lse:extendedTpegNonJunctionPoint>
+          <lse:kilometerPoint>10.379</lse:kilometerPoint>
+          <lse:province>Santa Cruz de Tenerife</lse:province>
+          <lse:municipality>San Cristóbal de La Laguna</lse:municipality>
+        </lse:extendedTpegNonJunctionPoint>
+      </sit:locationReference>
+      <sit:accidentType>collision</sit:accidentType>
+    </sit:situationRecord>
+  </sit:situation>
+
+  <sit:situation id="17264754">
+    <sit:overallSeverity>highest</sit:overallSeverity>
+    <!-- Un registro por sentido: la DGT parte así cada corte. -->
+    <sit:situationRecord xsi:type="sit:RoadOrCarriagewayOrLaneManagement" id="17264754_1" version="3">
+      <sit:situationRecordCreationTime>2025-05-22T08:00:00Z</sit:situationRecordCreationTime>
+      <sit:validity>
+        <com:validityStatus>active</com:validityStatus>
+        <com:validityTimeSpecification>
+          <com:overallStartTime>2025-05-22T06:00:00Z</com:overallStartTime>
+          <com:overallEndTime>2026-03-10T23:00:00Z</com:overallEndTime>
+        </com:validityTimeSpecification>
+      </sit:validity>
+      <sit:cause>
+        <sit:causeType>roadMaintenance</sit:causeType>
+      </sit:cause>
+      <sit:locationReference xsi:type="loc:SingleRoadLinearLocation">
+        <loc:supplementaryPositionalDescription>
+          <loc:roadInformation>
+            <loc:roadName>TF-82</loc:roadName>
+          </loc:roadInformation>
+        </loc:supplementaryPositionalDescription>
+        <loc:pointAlongLinearElement>
+          <loc:pointCoordinates>
+            <loc:latitude>28.3586</loc:latitude>
+            <loc:longitude>-16.7802</loc:longitude>
+          </loc:pointCoordinates>
+        </loc:pointAlongLinearElement>
+        <lse:extendedTpegNonJunctionPoint>
+          <lse:kilometerPoint>9.5</lse:kilometerPoint>
+          <lse:province>Santa Cruz de Tenerife</lse:province>
+          <lse:municipality>El Tanque</lse:municipality>
+        </lse:extendedTpegNonJunctionPoint>
+      </sit:locationReference>
+      <sit:roadOrCarriagewayOrLaneManagementType>roadClosed</sit:roadOrCarriagewayOrLaneManagementType>
+    </sit:situationRecord>
+    <sit:situationRecord xsi:type="sit:RoadOrCarriagewayOrLaneManagement" id="17264754_2" version="3">
+      <sit:situationRecordCreationTime>2025-05-22T08:00:00Z</sit:situationRecordCreationTime>
+      <sit:validity>
+        <com:validityStatus>active</com:validityStatus>
+        <com:validityTimeSpecification>
+          <com:overallStartTime>2025-05-22T06:00:00Z</com:overallStartTime>
+          <com:overallEndTime>2026-02-28T23:00:00Z</com:overallEndTime>
+        </com:validityTimeSpecification>
+      </sit:validity>
+      <sit:cause>
+        <sit:causeType>roadMaintenance</sit:causeType>
+      </sit:cause>
+      <sit:locationReference xsi:type="loc:SingleRoadLinearLocation">
+        <loc:supplementaryPositionalDescription>
+          <loc:roadInformation>
+            <loc:roadName>TF-82</loc:roadName>
+          </loc:roadInformation>
+        </loc:supplementaryPositionalDescription>
+        <loc:pointAlongLinearElement>
+          <loc:pointCoordinates>
+            <loc:latitude>28.3586</loc:latitude>
+            <loc:longitude>-16.7802</loc:longitude>
+          </loc:pointCoordinates>
+        </loc:pointAlongLinearElement>
+        <lse:extendedTpegNonJunctionPoint>
+          <lse:kilometerPoint>9.5</lse:kilometerPoint>
+          <lse:province>Santa Cruz de Tenerife</lse:province>
+          <lse:municipality>El Tanque</lse:municipality>
+        </lse:extendedTpegNonJunctionPoint>
+      </sit:locationReference>
+      <sit:roadOrCarriagewayOrLaneManagementType>roadClosed</sit:roadOrCarriagewayOrLaneManagementType>
+    </sit:situationRecord>
+  </sit:situation>
+
+  <sit:situation id="2">
+    <sit:overallSeverity>low</sit:overallSeverity>
+    <sit:situationRecord xsi:type="sit:MaintenanceWorks" id="2_1" version="1">
+      <sit:situationRecordCreationTime>2025-04-01T07:00:00Z</sit:situationRecordCreationTime>
+      <sit:validity>
+        <com:validityStatus>active</com:validityStatus>
+        <com:validityTimeSpecification>
+          <com:overallStartTime>2025-04-01T06:00:00Z</com:overallStartTime>
+          <com:overallEndTime>2025-07-31T21:00:00Z</com:overallEndTime>
+        </com:validityTimeSpecification>
+      </sit:validity>
+      <sit:locationReference xsi:type="loc:SingleRoadLinearLocation">
+        <loc:supplementaryPositionalDescription>
+          <loc:roadInformation>
+            <loc:roadName>TF-1</loc:roadName>
+          </loc:roadInformation>
+        </loc:supplementaryPositionalDescription>
+        <loc:pointAlongLinearElement>
+          <loc:pointCoordinates>
+            <loc:latitude>28.0501</loc:latitude>
+            <loc:longitude>-16.6874</loc:longitude>
+          </loc:pointCoordinates>
+        </loc:pointAlongLinearElement>
+        <lse:extendedTpegNonJunctionPoint>
+          <lse:kilometerPoint>72.1</lse:kilometerPoint>
+          <lse:province>Santa Cruz de Tenerife</lse:province>
+          <lse:municipality>Arona</lse:municipality>
+        </lse:extendedTpegNonJunctionPoint>
+      </sit:locationReference>
+      <sit:roadMaintenanceType>roadworks</sit:roadMaintenanceType>
+    </sit:situationRecord>
+  </sit:situation>
+
+  <!-- Fuera de Tenerife: Gran Canaria. -->
+  <sit:situation id="3">
+    <sit:situationRecord xsi:type="sit:Accident" id="3_1" version="1">
+      <sit:validity>
+        <com:validityStatus>active</com:validityStatus>
+        <com:validityTimeSpecification>
+          <com:overallStartTime>2025-06-02T07:00:00Z</com:overallStartTime>
+        </com:validityTimeSpecification>
+      </sit:validity>
+      <sit:locationReference xsi:type="loc:SingleRoadLinearLocation">
+        <loc:supplementaryPositionalDescription>
+          <loc:roadInformation>
+            <loc:roadName>GC-1</loc:roadName>
+          </loc:roadInformation>
+        </loc:supplementaryPositionalDescription>
+        <loc:pointAlongLinearElement>
+          <loc:pointCoordinates>
+            <loc:latitude>28.0590</loc:latitude>
+            <loc:longitude>-15.4200</loc:longitude>
+          </loc:pointCoordinates>
+        </loc:pointAlongLinearElement>
+      </sit:locationReference>
+    </sit:situationRecord>
+  </sit:situation>
+
+  <!-- Suspendida: no se muestra. -->
+  <sit:situation id="4">
+    <sit:situationRecord xsi:type="sit:VehicleObstruction" id="4_1" version="2">
+      <sit:validity>
+        <com:validityStatus>suspended</com:validityStatus>
+        <com:validityTimeSpecification>
+          <com:overallStartTime>2025-06-02T05:00:00Z</com:overallStartTime>
+        </com:validityTimeSpecification>
+      </sit:validity>
+      <sit:locationReference xsi:type="loc:SingleRoadLinearLocation">
+        <loc:pointAlongLinearElement>
+          <loc:pointCoordinates>
+            <loc:latitude>28.4200</loc:latitude>
+            <loc:longitude>-16.3300</loc:longitude>
+          </loc:pointCoordinates>
+        </loc:pointAlongLinearElement>
+      </sit:locationReference>
+    </sit:situationRecord>
+  </sit:situation>
+
+  <!-- Obras que ya terminaron. -->
+  <sit:situation id="5">
+    <sit:situationRecord xsi:type="sit:MaintenanceWorks" id="5_1" version="1">
+      <sit:validity>
+        <com:validityStatus>active</com:validityStatus>
+        <com:validityTimeSpecification>
+          <com:overallStartTime>2025-05-01T06:00:00Z</com:overallStartTime>
+          <com:overallEndTime>2025-05-31T21:00:00Z</com:overallEndTime>
+        </com:validityTimeSpecification>
+      </sit:validity>
+      <sit:locationReference xsi:type="loc:SingleRoadLinearLocation">
+        <loc:pointAlongLinearElement>
+          <loc:pointCoordinates>
+            <loc:latitude>28.3900</loc:latitude>
+            <loc:longitude>-16.5200</loc:longitude>
+          </loc:pointCoordinates>
+        </loc:pointAlongLinearElement>
+      </sit:locationReference>
+    </sit:situationRecord>
+  </sit:situation>
+
+  <!-- Obras programadas que todavía no han empezado. -->
+  <sit:situation id="6">
+    <sit:situationRecord xsi:type="sit:ConstructionWorks" id="6_1" version="1">
+      <sit:validity>
+        <com:validityStatus>planned</com:validityStatus>
+        <com:validityTimeSpecification>
+          <com:overallStartTime>2025-06-09T06:00:00Z</com:overallStartTime>
+          <com:overallEndTime>2025-06-20T21:00:00Z</com:overallEndTime>
+        </com:validityTimeSpecification>
+      </sit:validity>
+      <sit:locationReference xsi:type="loc:SingleRoadLinearLocation">
+        <loc:pointAlongLinearElement>
+          <loc:pointCoordinates>
+            <loc:latitude>28.4600</loc:latitude>
+            <loc:longitude>-16.2700</loc:longitude>
+          </loc:pointCoordinates>
+        </loc:pointAlongLinearElement>
+      </sit:locationReference>
+    </sit:situationRecord>
+  </sit:situation>
+</d2:payload>
