@@ -74,6 +74,11 @@ const maplibre = vi.hoisted(() => {
 });
 
 vi.mock("maplibre-gl", () => maplibre.module);
+const warning = vi.hoisted(() => ({ available: true }));
+vi.mock("@/lib/warning-icon", () => ({
+  WARNING_ICON: "alerta",
+  addWarningIcon: () => warning.available,
+}));
 const push = vi.fn();
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push }) }));
 vi.mock("@/lib/api/client", () => ({ getNetworkNow: vi.fn(), getIncidents: vi.fn() }));
@@ -92,6 +97,7 @@ const POINTS: MapPoint[] = [
 ];
 
 beforeEach(() => {
+  warning.available = true;
   push.mockReset();
   maplibre.FakeMap.camera = [];
   maplibre.FakeMap.layers = [];
@@ -114,6 +120,13 @@ describe("IslandMap", () => {
 
     maplibre.handlers.get("load")!();
     expect(maplibre.FakeMap.layers).toContainEqual(expect.objectContaining({ id: "stations" }));
+    expect(maplibre.FakeMap.layers).toContainEqual(
+      expect.objectContaining({
+        id: "incidents",
+        type: "symbol",
+        layout: expect.objectContaining({ "icon-image": "alerta" }),
+      }),
+    );
 
     maplibre.handlers.get("mouseenter:stations")!();
     expect(maplibre.canvas.style.cursor).toBe("pointer");
@@ -202,6 +215,16 @@ describe("IslandMap as a station picker", () => {
     ]);
     links[1]!.click();
     expect(push).toHaveBeenCalledWith("/prediccion?estacion=57%3A-1&fecha=2026-10-28");
+  });
+
+  it("falls back to circles for incidents when it cannot draw the warning sign", async () => {
+    warning.available = false;
+    render(<IslandMap points={[marker]} label="Mapa" />);
+    await waitFor(() => expect(maplibre.handlers.has("load")).toBe(true));
+    maplibre.handlers.get("load")!();
+    expect(maplibre.FakeMap.layers).toContainEqual(
+      expect.objectContaining({ id: "incidents", type: "circle" }),
+    );
   });
 
   it("jumps straight to the view when motion is reduced", async () => {

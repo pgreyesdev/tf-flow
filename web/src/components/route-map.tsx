@@ -8,6 +8,7 @@ import { useEffect, useRef, useState } from "react";
 import type { RoutePlan } from "@/lib/api/schemas";
 import { formatPercent, hourLabel } from "@/lib/format";
 import { incidentPlace, incidentTitle } from "@/lib/incidents";
+import { addWarningIcon, WARNING_ICON } from "@/lib/warning-icon";
 import { LEVEL_INFO } from "@/lib/levels";
 import { planBounds } from "@/lib/routes";
 
@@ -71,6 +72,7 @@ function markers(plan: RoutePlan, selected: number): GeoJSONSourceSpecification[
     features.push(
       point(incident.longitude, incident.latitude, {
         color: INCIDENT_COLOR,
+        incident: 1,
         title: `⚠ ${incidentTitle(incident)}`,
         detail: `${incidentPlace(incident)} · Fuente: DGT`,
       }),
@@ -188,10 +190,13 @@ export function RouteMap({
             });
           });
           map.addSource("markers", { type: "geojson", data: markers(plan, selectedRef.current) });
+          // Las incidencias van con la señal de peligro encima de los demás puntos.
+          const warning = addWarningIcon(map);
           map.addLayer({
             id: "markers",
             type: "circle",
             source: "markers",
+            ...(warning ? { filter: ["!", ["has", "incident"]] } : {}),
             paint: {
               "circle-color": ["get", "color"],
               "circle-radius": 7,
@@ -199,16 +204,27 @@ export function RouteMap({
               "circle-stroke-width": 2,
             },
           });
-          map.on("click", "markers", (event) => {
-            const properties = event.features?.[0]?.properties;
-            if (!properties) {
-              return;
-            }
-            popup
-              .setLngLat(event.lngLat)
-              .setDOMContent(popupContent(String(properties.title), String(properties.detail)))
-              .addTo(map);
-          });
+          if (warning) {
+            map.addLayer({
+              id: "markers-incidents",
+              type: "symbol",
+              source: "markers",
+              filter: ["has", "incident"],
+              layout: { "icon-image": WARNING_ICON, "icon-allow-overlap": true },
+            });
+          }
+          for (const layer of warning ? ["markers", "markers-incidents"] : ["markers"]) {
+            map.on("click", layer, (event) => {
+              const properties = event.features?.[0]?.properties;
+              if (!properties) {
+                return;
+              }
+              popup
+                .setLngLat(event.lngLat)
+                .setDOMContent(popupContent(String(properties.title), String(properties.detail)))
+                .addTo(map);
+            });
+          }
           setReady(true);
         });
         map.on("error", (event) => {

@@ -69,6 +69,11 @@ const maplibre = vi.hoisted(() => {
 });
 
 vi.mock("maplibre-gl", () => maplibre.module);
+const warning = vi.hoisted(() => ({ available: true }));
+vi.mock("@/lib/warning-icon", () => ({
+  WARNING_ICON: "alerta",
+  addWarningIcon: () => warning.available,
+}));
 const push = vi.fn();
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push }) }));
 
@@ -131,6 +136,11 @@ describe("RouteResults", () => {
       features: [{ properties: { title: "Salida: Santa Cruz", detail: "" } }],
     });
     expect(maplibre.popup.content!.children).toHaveLength(1);
+    maplibre.handlers.get("click:markers-incidents")!({
+      lngLat: { lng: -16.31, lat: 28.48 },
+      features: [{ properties: { title: "⚠ Accidente", detail: "TF-5 · Fuente: DGT" } }],
+    });
+    expect(maplibre.popup.content).toHaveTextContent("⚠ AccidenteTF-5 · Fuente: DGT");
 
     const error = vi.spyOn(console, "error").mockImplementation(() => {});
     maplibre.handlers.get("error")!({ sourceId: "openmaptiles", error: new Error("tesela") });
