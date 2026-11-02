@@ -11,5 +11,7 @@ const SKIES: Record<Level, string> = {
  * del contenedor le dé margen y deje sin cielo el final de la pantalla.
  */
 export function Sky({ level = "low" }: { level?: Level }) {
-  return <div aria-hidden="true" data-level={level} className={`${SKIES[level]} m-0!`} />;
+  return (
+    <div aria-hidden="true" data-level={level} className={`${SKIES[level]} sky-backdrop m-0!`} />
+  );
 }

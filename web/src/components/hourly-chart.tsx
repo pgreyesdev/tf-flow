@@ -64,7 +64,7 @@ export function HourlyChart({
         preserveAspectRatio="none"
         role="img"
         aria-label={summary}
-        className={cx("mt-1 w-full", compact ? "h-28" : "h-44 sm:h-56")}
+        className={cx("grow-bars mt-1 w-full", compact ? "h-28" : "h-44 sm:h-56")}
       >
         {[0.25, 0.5, 0.75].map((f) => (
           <line
@@ -125,7 +125,7 @@ export function HourlyChart({
               </span>
             )}
           </figcaption>
-          <details className="mt-4 rounded-xl border border-glass-line bg-glass">
+          <details className="smooth mt-4 rounded-xl border border-glass-line bg-glass">
             <summary className="cursor-pointer px-4 py-3 font-semibold">
               Ver los datos hora a hora
             </summary>

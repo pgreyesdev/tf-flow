@@ -20,13 +20,13 @@ interface DayListProps {
  */
 export function DayList({ days, today, selected, href }: DayListProps) {
   return (
-    <ul className="divide-y divide-glass-line">
+    <ul className="cascade divide-y divide-glass-line">
       {days.map((day) => {
         const name = day.date === today ? "Hoy" : shortWeekday(day.date);
         const left = Math.round(day.minRisk * 100);
         const width = Math.max(Math.round((day.maxRisk - day.minRisk) * 100), 3);
         return (
-          <li key={day.date}>
+          <li key={day.date} className="animate-rise">
             <Link
               href={href(day.date)}
               aria-current={day.date === selected ? "date" : undefined}
@@ -55,6 +55,7 @@ export function DayList({ days, today, selected, href }: DayListProps) {
                   height="6"
                   rx="3"
                   className={cx(
+                    "grow-bar-x",
                     day.level === "high"
                       ? "fill-high"
                       : day.level === "medium"

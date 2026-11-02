@@ -11,6 +11,8 @@ htmlcov/
 
 # Datos y modelos generados (se descargan o se entrenan, no se versionan)
 data/
+# Salvo las muestras pequeñas que usan los tests.
+!backend/tests/data/
 artifacts/
 mlruns/
 

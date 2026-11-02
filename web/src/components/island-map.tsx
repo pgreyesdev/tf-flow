@@ -8,13 +8,14 @@ import type {
   RasterDEMSourceSpecification,
   StyleSpecification,
 } from "maplibre-gl";
+import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
 import type { Incident, Level } from "@/lib/api/schemas";
 import { formatPercent } from "@/lib/format";
 import { incidentPlace, incidentSince, incidentsNear, incidentTitle } from "@/lib/incidents";
 import { LEVEL_INFO } from "@/lib/levels";
-import type { MapPoint } from "@/lib/map";
+import type { MapMarker } from "@/lib/map";
 
 /** Los mismos colores que el resto de la web (globals.css). WebGL no lee variables CSS. */
 export const LEVEL_COLORS: Record<Level, string> = {
@@ -34,6 +35,9 @@ const TERRAIN: RasterDEMSourceSpecification = {
   bounds: [-16.98, 27.96, -16.08, 28.64],
   attribution: "Relieve: Terrain Tiles (Mapzen, AWS Open Data)",
 };
+
+/** Estaciones sin previsión de esta hora: el azul de los enlaces, que no es ningún nivel. */
+const UNKNOWN_COLOR = "#7dd3fc";
 
 /** Las incidencias van en blanco con borde naranja: no se confunden con ningún nivel. */
 export const INCIDENT_COLOR = "#fb923c";
@@ -98,8 +102,11 @@ const VIEW = {
   bearing: -15,
 };
 
+/** Al cargar, el mapa empieza visto desde arriba y gira hasta la vista inclinada. */
+const INTRO = { pitch: 0, bearing: 20 };
+
 function asGeoJson(
-  points: MapPoint[],
+  points: MapMarker[],
   nearby: Map<number, Incident[]>,
 ): GeoJSONSourceSpecification["data"] {
   return {
@@ -110,7 +117,8 @@ function asGeoJson(
       geometry: { type: "Point" as const, coordinates: [p.longitude, p.latitude] },
       properties: {
         stationId: p.stationId,
-        color: LEVEL_COLORS[p.level],
+        color: p.level ? LEVEL_COLORS[p.level] : UNKNOWN_COLOR,
+        high: p.level === "high",
         // Las estaciones con una incidencia cerca llevan el borde naranja de las incidencias.
         stroke: nearby.get(p.stationId)?.length ? INCIDENT_COLOR : "#050b18",
       },
@@ -153,39 +161,77 @@ function incidentPopup(incident: Incident): HTMLElement {
   return box;
 }
 
+function forecastHref(key: string, query: Record<string, string>): string {
+  return `/prediccion?${new URLSearchParams({ estacion: key, ...query }).toString()}`;
+}
+
 /** Contenido del globo al pulsar una estación. Se construye con nodos: nada de HTML a mano. */
-function popupContent(point: MapPoint, near: Incident[]): HTMLElement {
+function popupContent(
+  point: MapMarker,
+  near: Incident[],
+  query: Record<string, string>,
+): HTMLElement {
   const box = document.createElement("div");
   box.className = "space-y-1 text-night";
   const name = document.createElement("p");
   name.className = "font-bold";
   name.textContent = point.name;
-  const level = document.createElement("p");
-  level.textContent = `${LEVEL_INFO[point.level].label} · ${formatPercent(point.probabilityHigh)} de riesgo de atasco`;
-  const link = document.createElement("a");
-  link.href = `/prediccion?${new URLSearchParams({ estacion: point.key }).toString()}`;
-  link.className = "font-semibold text-accent-ink underline";
-  link.textContent = "Ver la previsión del día";
-  box.append(name, level);
+  box.append(name);
+  if (point.level) {
+    const risk =
+      point.probabilityHigh === undefined
+        ? ""
+        : ` · ${formatPercent(point.probabilityHigh)} de riesgo de atasco`;
+    box.append(paragraph(`${LEVEL_INFO[point.level].label}${risk}`));
+  }
   for (const incident of near) {
     const place = incident.road ? ` en la ${incident.road}` : "";
     box.append(paragraph(`⚠ Cerca: ${incidentTitle(incident)}${place}`, "font-semibold"));
   }
-  box.append(link);
+  const directions = point.directions ?? [];
+  if (directions.length > 1) {
+    box.append(paragraph("¿En qué sentido vas?", "pt-1 text-xs font-bold uppercase opacity-70"));
+    const list = document.createElement("div");
+    list.className = "flex flex-col gap-1.5";
+    for (const direction of directions) {
+      const link = document.createElement("a");
+      link.href = forecastHref(direction.key, query);
+      link.className =
+        "rounded-lg bg-night px-3 py-1.5 text-center font-semibold text-white no-underline transition-transform hover:scale-[1.03]";
+      link.textContent = `${direction.label} →`;
+      list.append(link);
+    }
+    box.append(list);
+  } else {
+    const link = document.createElement("a");
+    link.href = forecastHref(directions[0]?.key ?? point.key, query);
+    link.className = "font-semibold text-accent-ink underline";
+    link.textContent = "Ver la previsión del día";
+    box.append(link);
+  }
   return box;
 }
+
+const NO_QUERY: Record<string, string> = {};
 
 export function IslandMap({
   points,
   incidents = NO_INCIDENTS,
   label,
+  selectedId,
+  query = NO_QUERY,
 }: {
-  points: MapPoint[];
+  points: MapMarker[];
   incidents?: Incident[];
   label: string;
+  /** Estación elegida: se rodea con un anillo y el mapa se acerca a ella. */
+  selectedId?: number;
+  /** Parámetros que se añaden a los enlaces de los globos, como la fecha elegida. */
+  query?: Record<string, string>;
 }) {
   const container = useRef<HTMLDivElement>(null);
   const [failed, setFailed] = useState(false);
+  const router = useRouter();
 
   useEffect(() => {
     const element = container.current;
@@ -194,7 +240,25 @@ export function IslandMap({
     }
     let map: MapLibreMap | undefined;
     let cancelled = false;
+    let frame = 0;
     const byId = new Map(points.map((p) => [p.stationId, p]));
+    // Los enlaces de los globos navegan sin recargar la página, como los del resto de la web.
+    const navigate = (event: MouseEvent) => {
+      const link = (event.target as HTMLElement).closest("a");
+      const href = link?.getAttribute("href");
+      if (
+        !href?.startsWith("/") ||
+        event.button !== 0 ||
+        event.metaKey ||
+        event.ctrlKey ||
+        event.shiftKey ||
+        event.altKey
+      ) {
+        return;
+      }
+      event.preventDefault();
+      router.push(href as Parameters<typeof router.push>[0]);
+    };
     const incidentsById = new Map(incidents.map((i) => [i.id, i]));
     const nearby = new Map(points.map((p) => [p.stationId, incidentsNear(incidents, p)]));
 
@@ -211,6 +275,7 @@ export function IslandMap({
           container: element,
           style: STYLE,
           ...VIEW,
+          ...(reduceMotion ? {} : INTRO),
           minZoom: 7,
           attributionControl: { compact: true },
           maxZoom: 13,
@@ -241,6 +306,34 @@ export function IslandMap({
             return;
           }
           map.addSource("stations", { type: "geojson", data: asGeoJson(points, nearby) });
+          // Un halo que late alrededor de las estaciones con atasco.
+          map.addLayer({
+            id: "stations-pulse",
+            type: "circle",
+            source: "stations",
+            filter: ["==", ["get", "high"], true],
+            paint: {
+              "circle-color": LEVEL_COLORS.high,
+              "circle-radius": 8,
+              "circle-opacity": 0.35,
+              "circle-pitch-alignment": "viewport",
+            },
+          });
+          if (selectedId !== undefined) {
+            map.addLayer({
+              id: "selected",
+              type: "circle",
+              source: "stations",
+              filter: ["==", ["get", "stationId"], selectedId],
+              paint: {
+                "circle-color": "rgba(0,0,0,0)",
+                "circle-radius": ["interpolate", ["linear"], ["zoom"], 8, 10, 11, 14, 13, 18],
+                "circle-stroke-color": "#ffffff",
+                "circle-stroke-width": 3,
+                "circle-pitch-alignment": "viewport",
+              },
+            });
+          }
           map.addLayer({
             id: "stations",
             type: "circle",
@@ -283,10 +376,9 @@ export function IslandMap({
             if (!map || !point) {
               return;
             }
-            popup
-              .setLngLat([point.longitude, point.latitude])
-              .setDOMContent(popupContent(point, nearby.get(point.stationId) ?? []))
-              .addTo(map);
+            const content = popupContent(point, nearby.get(point.stationId) ?? [], query);
+            content.addEventListener("click", navigate);
+            popup.setLngLat([point.longitude, point.latitude]).setDOMContent(content).addTo(map);
           });
           for (const layer of ["stations", "incidents"]) {
             map.on("mouseenter", layer, () => {
@@ -296,6 +388,32 @@ export function IslandMap({
               map?.getCanvas().style.removeProperty("cursor");
             });
           }
+
+          const selected = selectedId === undefined ? undefined : byId.get(selectedId);
+          const target = selected
+            ? {
+                center: [selected.longitude, selected.latitude] as [number, number],
+                zoom: 10.4,
+                pitch: VIEW.pitch,
+                bearing: VIEW.bearing,
+              }
+            : { pitch: VIEW.pitch, bearing: VIEW.bearing };
+          if (reduceMotion) {
+            map.jumpTo(target);
+            return;
+          }
+          map.easeTo({ ...target, duration: 2400, easing: (t) => 1 - Math.pow(1 - t, 3) });
+          const start = performance.now();
+          const pulse = (now: number) => {
+            if (!map) {
+              return;
+            }
+            const phase = ((now - start) % 1800) / 1800;
+            map.setPaintProperty("stations-pulse", "circle-radius", 6 + phase * 16);
+            map.setPaintProperty("stations-pulse", "circle-opacity", 0.45 * (1 - phase));
+            frame = requestAnimationFrame(pulse);
+          };
+          frame = requestAnimationFrame(pulse);
         });
         map.on("error", (event) => {
           // Una tesela del mar que no existe no es un fallo: el resto del mapa sigue bien.
@@ -308,9 +426,11 @@ export function IslandMap({
 
     return () => {
       cancelled = true;
+      cancelAnimationFrame(frame);
       map?.remove();
+      map = undefined;
     };
-  }, [points, incidents]);
+  }, [points, incidents, selectedId, query, router]);
 
   if (failed) {
     return (

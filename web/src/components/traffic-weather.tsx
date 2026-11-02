@@ -21,6 +21,7 @@ import {
 import { LEVEL_INFO } from "@/lib/levels";
 import { stationKey } from "@/lib/stations";
 
+import { CountUp } from "./count-up";
 import { DayList } from "./day-list";
 import { FactorList } from "./forecast-insights";
 import { GlassCard } from "./glass-card";
@@ -61,7 +62,7 @@ export function TrafficWeather({
 
   return (
     <div className="space-y-4">
-      <header className="pt-6 pb-4 text-center sm:pt-10 sm:pb-8">
+      <header className="animate-rise pt-6 pb-4 text-center sm:pt-10 sm:pb-8">
         <p className="text-sm font-bold tracking-wider text-ink-soft uppercase first-letter:uppercase">
           {dayLabel}
         </p>
@@ -70,7 +71,7 @@ export function TrafficWeather({
         </Heading>
         <p className="text-ink-soft">Sentido {forecast.station.direction_label}</p>
         <p className="mt-2 text-8xl leading-none font-extralight tracking-tighter tabular sm:text-9xl">
-          {Math.round(headline.probability_high * 100)}
+          <CountUp value={Math.round(headline.probability_high * 100)} duration={900} />
           <span className="align-top text-5xl font-light sm:text-6xl">%</span>
         </p>
         <p className="mt-2 text-xl font-bold">
@@ -91,7 +92,7 @@ export function TrafficWeather({
         </p>
       </header>
 
-      <section aria-labelledby="hourly-title" className="glass p-4 sm:p-5">
+      <section aria-labelledby="hourly-title" className="glass stagger-1 animate-rise p-4 sm:p-5">
         <h2 id="hourly-title" className="sr-only">
           Hora a hora
         </h2>
@@ -107,7 +108,7 @@ export function TrafficWeather({
         </div>
       </section>
 
-      <div className="grid gap-4 lg:grid-cols-[1.1fr_1fr]">
+      <div className="stagger-2 grid animate-rise gap-4 lg:grid-cols-[1.1fr_1fr]">
         {days.length > 1 && (
           <GlassCard title={`Próximos ${days.length} días`} icon={CalendarDays}>
             <DayList
@@ -156,7 +157,7 @@ export function TrafficWeather({
         </div>
       </div>
 
-      <GlassCard title="Vehículos por hora" icon={Clock}>
+      <GlassCard title="Vehículos por hora" icon={Clock} className="stagger-3 animate-rise">
         <HourlyChart
           hours={forecast.hours}
           highlight={focus.hour.time}

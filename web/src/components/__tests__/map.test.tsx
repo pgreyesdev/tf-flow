@@ -5,7 +5,7 @@ import { NearbyIncidents } from "@/components/incidents";
 import { NetworkMap, NetworkMapSkeleton } from "@/components/network-map";
 import { getIncidents, getNetworkNow } from "@/lib/api/client";
 import type { NetworkNow, Station } from "@/lib/api/schemas";
-import type { MapPoint } from "@/lib/map";
+import type { MapMarker, MapPoint } from "@/lib/map";
 import { hourly, INCIDENTS, STATIONS } from "@/test/fixtures";
 
 type Handler = (event?: unknown) => void;
@@ -38,6 +38,14 @@ const maplibre = vi.hoisted(() => {
     remove() {
       FakeMap.removed += 1;
     }
+    static camera: unknown[] = [];
+    easeTo(options: unknown) {
+      FakeMap.camera.push(["easeTo", options]);
+    }
+    jumpTo(options: unknown) {
+      FakeMap.camera.push(["jumpTo", options]);
+    }
+    setPaintProperty() {}
   }
   class FakePopup {
     setLngLat() {
@@ -66,6 +74,8 @@ const maplibre = vi.hoisted(() => {
 });
 
 vi.mock("maplibre-gl", () => maplibre.module);
+const push = vi.fn();
+vi.mock("next/navigation", () => ({ useRouter: () => ({ push }) }));
 vi.mock("@/lib/api/client", () => ({ getNetworkNow: vi.fn(), getIncidents: vi.fn() }));
 
 const POINTS: MapPoint[] = [
@@ -82,6 +92,9 @@ const POINTS: MapPoint[] = [
 ];
 
 beforeEach(() => {
+  push.mockReset();
+  maplibre.FakeMap.camera = [];
+  maplibre.FakeMap.layers = [];
   maplibre.handlers.clear();
   maplibre.popup.content = undefined;
   vi.stubGlobal("matchMedia", () => ({ matches: false }));
@@ -149,6 +162,54 @@ describe("IslandMap", () => {
     render(<IslandMap points={POINTS} label="Mapa" />);
     expect(await screen.findByText(/no puede mostrar el mapa/)).toBeInTheDocument();
     maplibre.module.Map = original;
+  });
+});
+
+describe("IslandMap as a station picker", () => {
+  const marker: MapMarker = {
+    stationId: 57,
+    name: "Los Cristianos",
+    latitude: 28.05,
+    longitude: -16.71,
+    key: "57:1",
+    directions: [
+      { key: "57:1", label: "Sentido creciente" },
+      { key: "57:-1", label: "Sentido decreciente" },
+    ],
+  };
+
+  it("rings the chosen station, flies to it and lets you pick a direction", async () => {
+    render(
+      <IslandMap points={[marker]} selectedId={57} query={{ fecha: "2026-10-28" }} label="Mapa" />,
+    );
+    await waitFor(() => expect(maplibre.handlers.has("load")).toBe(true));
+    maplibre.handlers.get("load")!();
+    expect(maplibre.FakeMap.layers).toContainEqual(
+      expect.objectContaining({ id: "selected", filter: ["==", ["get", "stationId"], 57] }),
+    );
+    expect(maplibre.FakeMap.camera).toContainEqual([
+      "easeTo",
+      expect.objectContaining({ center: [-16.71, 28.05], pitch: 55 }),
+    ]);
+
+    maplibre.handlers.get("click:stations")!({ features: [{ properties: { stationId: 57 } }] });
+    const popup = maplibre.popup.content!;
+    expect(popup).toHaveTextContent("Los Cristianos¿En qué sentido vas?");
+    const links = within(popup).getAllByRole("link");
+    expect(links.map((l) => l.getAttribute("href"))).toEqual([
+      "/prediccion?estacion=57%3A1&fecha=2026-10-28",
+      "/prediccion?estacion=57%3A-1&fecha=2026-10-28",
+    ]);
+    links[1]!.click();
+    expect(push).toHaveBeenCalledWith("/prediccion?estacion=57%3A-1&fecha=2026-10-28");
+  });
+
+  it("jumps straight to the view when motion is reduced", async () => {
+    vi.stubGlobal("matchMedia", () => ({ matches: true }));
+    render(<IslandMap points={[marker]} label="Mapa" />);
+    await waitFor(() => expect(maplibre.handlers.has("load")).toBe(true));
+    maplibre.handlers.get("load")!();
+    expect(maplibre.FakeMap.camera).toEqual([["jumpTo", { pitch: 55, bearing: -15 }]]);
   });
 });
 
