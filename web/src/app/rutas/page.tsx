@@ -1,3 +1,4 @@
+import { PageTransition } from "@/components/page-transition";
 import type { Metadata } from "next";
 
 import { Notice } from "@/components/notice";
@@ -122,12 +123,14 @@ export default async function RoutesPage({ searchParams }: PageProps<"/rutas">) 
 
 function PageShell({ children }: { children: React.ReactNode }) {
   return (
-    <div className="mx-auto max-w-5xl space-y-4 px-4 pt-2 sm:px-6">
-      <h1 className="pt-4 font-display text-3xl font-extrabold sm:text-4xl">Rutas</h1>
-      <p className="-mt-2 text-ink-soft">
-        Compara cómo ir de un sitio a otro con el tráfico previsto y las incidencias de ahora.
-      </p>
-      {children}
-    </div>
+    <PageTransition>
+      <div className="mx-auto max-w-5xl space-y-4 px-4 pt-2 sm:px-6">
+        <h1 className="pt-4 font-display text-3xl font-extrabold sm:text-4xl">Rutas</h1>
+        <p className="-mt-2 text-ink-soft">
+          Compara cómo ir de un sitio a otro con el tráfico previsto y las incidencias de ahora.
+        </p>
+        {children}
+      </div>
+    </PageTransition>
   );
 }

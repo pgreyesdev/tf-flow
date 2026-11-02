@@ -16,7 +16,7 @@ interface HourlyStripProps {
 export function HourlyStrip({ hours, now, highlight }: HourlyStripProps) {
   return (
     <ol
-      className="scroll-x relative -mx-1 flex gap-1 overflow-x-auto px-1 pb-1"
+      className="scroll-x cascade relative -mx-1 flex gap-1 overflow-x-auto px-1 pb-1"
       aria-label="Hora a hora"
     >
       {hours.map((hour) => {
@@ -25,7 +25,7 @@ export function HourlyStrip({ hours, now, highlight }: HourlyStripProps) {
           <li
             key={hour.time}
             className={cx(
-              "flex min-w-16 snap-start flex-col items-center gap-2 rounded-2xl px-2 py-3",
+              "flex min-w-16 animate-rise snap-start flex-col items-center gap-2 rounded-2xl px-2 py-3 transition-colors duration-200 hover:bg-glass",
               hour.time === highlight && "bg-glass-strong ring-1 ring-glass-line",
             )}
           >

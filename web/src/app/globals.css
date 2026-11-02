@@ -202,3 +202,267 @@
         filter: invert(1);
     }
 }
+
+/*
+ * Movimiento. Todo es CSS para no cargar librerías: las entradas al cargar la página, los bloques
+ * que aparecen al hacer scroll (con `animation-timeline: view()`, donde el navegador lo admite) y
+ * las transiciones entre páginas con la API de View Transitions. Quien pide menos movimiento en
+ * su sistema ve la web quieta.
+ */
+@theme {
+    --ease-out-soft: cubic-bezier(0.22, 1, 0.36, 1);
+    --animate-rise: rise 800ms var(--ease-out-soft) both;
+    --animate-fade-in: fade-in 600ms ease-out both;
+    --animate-pop: pop 500ms var(--ease-out-soft) both;
+    --animate-float: float 7s ease-in-out infinite;
+    --animate-glow: glow 2.4s ease-in-out infinite;
+}
+
+@keyframes rise {
+    from {
+        opacity: 0;
+        transform: translate3d(0, 28px, 0);
+    }
+    to {
+        opacity: 1;
+        transform: none;
+    }
+}
+
+@keyframes fade-in {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+@keyframes pop {
+    from {
+        opacity: 0;
+        transform: scale(0.92);
+    }
+    to {
+        opacity: 1;
+        transform: none;
+    }
+}
+
+@keyframes float {
+    0%,
+    100% {
+        transform: translate3d(0, 0, 0);
+    }
+    50% {
+        transform: translate3d(0, -10px, 0);
+    }
+}
+
+@keyframes glow {
+    0%,
+    100% {
+        box-shadow: 0 0 0 0 rgb(255 255 255 / 0.35);
+    }
+    50% {
+        box-shadow: 0 0 0 10px rgb(255 255 255 / 0);
+    }
+}
+
+@keyframes grow-y {
+    from {
+        transform: scaleY(0);
+    }
+    to {
+        transform: none;
+    }
+}
+
+@keyframes grow-x {
+    from {
+        transform: scaleX(0);
+    }
+    to {
+        transform: none;
+    }
+}
+
+@keyframes reveal {
+    from {
+        opacity: 0;
+        transform: translate3d(0, 48px, 0) scale(0.97);
+    }
+    to {
+        opacity: 1;
+        transform: none;
+    }
+}
+
+@layer components {
+    /* Retrasos escalonados para entradas en cascada: `stagger-1` … `stagger-6`. */
+    .stagger-1 {
+        animation-delay: 80ms;
+    }
+    .stagger-2 {
+        animation-delay: 160ms;
+    }
+    .stagger-3 {
+        animation-delay: 240ms;
+    }
+    .stagger-4 {
+        animation-delay: 320ms;
+    }
+    .stagger-5 {
+        animation-delay: 400ms;
+    }
+    .stagger-6 {
+        animation-delay: 480ms;
+    }
+
+    /* Tarjetas que se elevan un poco al pasar el ratón o al enfocarlas. */
+    /* Usa `translate` y no `transform` para no chocar con las animaciones de entrada. */
+    .lift {
+        transition:
+            translate 300ms var(--ease-out-soft),
+            background-color 300ms ease,
+            border-color 300ms ease,
+            box-shadow 300ms ease;
+    }
+    .lift:hover,
+    .lift:focus-within {
+        translate: 0 -4px;
+        border-color: rgb(255 255 255 / 0.32);
+        box-shadow: 0 18px 40px -18px rgb(0 0 0 / 0.6);
+    }
+
+    /* Barras de las gráficas: crecen desde abajo (o desde la izquierda) al aparecer. */
+    .grow-bars > rect[data-level] {
+        transform-box: fill-box;
+        transform-origin: 50% 100%;
+        animation: grow-y 700ms var(--ease-out-soft) both;
+    }
+    .grow-bar-x {
+        transform-box: fill-box;
+        transform-origin: 0 50%;
+        animation: grow-x 800ms var(--ease-out-soft) 200ms both;
+    }
+    /* La cascada usa sibling-index() donde existe; si no, todas crecen a la vez. */
+    @supports (animation-delay: calc(sibling-index() * 1ms)) {
+        .grow-bars > rect[data-level] {
+            animation-delay: calc(sibling-index() * 22ms);
+        }
+        .cascade > * {
+            animation-delay: calc(sibling-index() * 45ms);
+        }
+    }
+
+    /* Bloques que aparecen al entrar en pantalla mientras haces scroll. */
+    @supports (animation-timeline: view()) {
+        @media (prefers-reduced-motion: no-preference) {
+            .reveal {
+                animation: reveal linear both;
+                animation-timeline: view();
+                animation-range: entry 0% entry 55%;
+            }
+        }
+    }
+
+    /* Los desplegables se abren y cierran con suavidad donde el navegador lo admite. */
+    details.smooth::details-content {
+        block-size: 0;
+        overflow-y: clip;
+        transition:
+            block-size 400ms var(--ease-out-soft),
+            content-visibility 400ms allow-discrete;
+    }
+    details.smooth[open]::details-content {
+        block-size: auto;
+    }
+
+    .site-header {
+        view-transition-name: site-header;
+    }
+
+    /* Solo el cielo de fondo: la maqueta del móvil también usa .sky y los nombres son únicos. */
+    .sky-backdrop {
+        view-transition-name: sky;
+    }
+}
+
+:root {
+    interpolate-size: allow-keywords;
+}
+
+/* Transiciones entre páginas: la anterior se desvanece hacia arriba y la nueva sube. */
+::view-transition {
+    pointer-events: none;
+}
+
+::view-transition-group(site-header) {
+    animation: none;
+    z-index: 100;
+}
+
+::view-transition-old(site-header) {
+    display: none;
+}
+
+::view-transition-new(site-header) {
+    animation: none;
+}
+
+::view-transition-group(sky) {
+    animation-duration: 600ms;
+}
+
+::view-transition-old(.page-exit) {
+    animation: 180ms ease-in both vt-out;
+}
+
+::view-transition-new(.page-enter) {
+    animation: 420ms var(--ease-out-soft) 120ms both vt-in;
+}
+
+::view-transition-old(.swap),
+::view-transition-new(.swap) {
+    animation-duration: 320ms;
+}
+
+@keyframes vt-out {
+    to {
+        opacity: 0;
+        transform: translate3d(0, -12px, 0);
+        filter: blur(4px);
+    }
+}
+
+@keyframes vt-in {
+    from {
+        opacity: 0;
+        transform: translate3d(0, 24px, 0);
+        filter: blur(4px);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    *,
+    ::before,
+    ::after {
+        animation-duration: 1ms !important;
+        animation-delay: 0s !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 1ms !important;
+    }
+
+    ::view-transition-old(*),
+    ::view-transition-new(*),
+    ::view-transition-group(*) {
+        animation-duration: 0s !important;
+        animation-delay: 0s !important;
+    }
+
+    .lift:hover,
+    .lift:focus-within {
+        translate: none;
+    }
+}

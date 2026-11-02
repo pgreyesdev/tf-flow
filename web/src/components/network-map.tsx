@@ -52,14 +52,17 @@ export async function NetworkMap() {
 
   return (
     <section aria-labelledby="map-title">
-      <h2 id="map-title" className="font-display text-3xl font-extrabold sm:text-4xl">
-        La isla, ahora
-      </h2>
-      <p className="mt-2 text-ink-soft">
-        Previsión de las {hour} en {points.length} puntos de medida. Pulsa uno para ver su día.
-      </p>
+      <div className="reveal">
+        <p className="text-sm font-bold tracking-wider text-accent uppercase">Empieza por aquí</p>
+        <h2 id="map-title" className="mt-2 font-display text-3xl font-extrabold sm:text-5xl">
+          La isla, ahora
+        </h2>
+        <p className="mt-3 text-lg text-ink-soft">
+          Previsión de las {hour} en {points.length} puntos de medida. Pulsa uno para ver su día.
+        </p>
+      </div>
 
-      <div className="glass mt-6 overflow-hidden p-0">
+      <div className="glass reveal mt-8 overflow-hidden p-0">
         <div className="h-[22rem] sm:h-[34rem]">
           <IslandMap
             points={points}

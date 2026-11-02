@@ -1,29 +1,24 @@
-import { ChevronDown, MapPin } from "lucide-react";
 import type { Metadata } from "next";
-import { Suspense } from "react";
+import { Suspense, ViewTransition } from "react";
 
-import { ForecastForm } from "@/components/forecast-form";
-import { NearbyIncidents } from "@/components/incidents";
+import { loadIncidents, NearbyIncidents } from "@/components/incidents";
 import { Notice } from "@/components/notice";
+import { PageTransition } from "@/components/page-transition";
 import { Sky } from "@/components/sky";
+import { StationPicker } from "@/components/station-picker";
+import { StationSwitcher } from "@/components/station-switcher";
 import { TrafficWeather } from "@/components/traffic-weather";
-import { ApiError, getStations } from "@/lib/api/client";
+import { ApiError, getNetworkNow, getStations } from "@/lib/api/client";
 import { getOutlook, type Outlook } from "@/lib/api/outlook";
 import type { Station } from "@/lib/api/schemas";
-import { serverEnv } from "@/lib/env";
 import { headlineHour } from "@/lib/forecast";
 import { addDays, currentHourInTenerife, isIsoDate, todayInTenerife } from "@/lib/format";
-import {
-  findStation,
-  parseStationKey,
-  sortStations,
-  stationKey,
-  stationLabel,
-} from "@/lib/stations";
+import { pickerMarkers } from "@/lib/map";
+import { findStation, parseStationKey, sortStations, stationKey } from "@/lib/stations";
 
 export const metadata: Metadata = {
-  title: "Previsión por estación",
-  description: "Consulta hora a hora el tráfico previsto en cada punto de medida de Tenerife.",
+  title: "Previsión por tramo",
+  description: "Elige tu tramo en el mapa de Tenerife y consulta hora a hora el tráfico previsto.",
 };
 
 const PAST_DAYS = 7;
@@ -73,7 +68,7 @@ export default async function ForecastPage({ searchParams }: PageProps<"/predicc
       <PageShell>
         <Sky />
         <h1 className="pt-4 font-display text-3xl font-extrabold sm:text-4xl">
-          Previsión por estación
+          Previsión por tramo
         </h1>
         <Notice tone="error" title="No podemos cargar las estaciones">
           {ERROR_MESSAGES[error.kind]}
@@ -85,14 +80,15 @@ export default async function ForecastPage({ searchParams }: PageProps<"/predicc
   const requestedDate = first(params.fecha);
   const date = requestedDate && isIsoDate(requestedDate) ? requestedDate : today;
   const ref = parseStationKey(first(params.estacion));
-  const featured = parseStationKey(serverEnv().TFFLOW_FEATURED_STATION);
-  const station =
-    (ref && findStation(stations, ref)) ||
-    (featured && findStation(stations, featured)) ||
-    stations[0];
-  const unknownStation = ref !== null && !findStation(stations, ref);
+  const station = ref ? findStation(stations, ref) : undefined;
+  const unknownStation = first(params.estacion) !== undefined && !station;
 
-  const result = station ? await loadOutlook(station, date, today) : undefined;
+  const [result, network, incidents] = await Promise.all([
+    station ? loadOutlook(station, date, today) : undefined,
+    getNetworkNow().catch(() => undefined),
+    loadIncidents(),
+  ]);
+  const markers = pickerMarkers(stations, network);
   const currentHour = currentHourInTenerife();
 
   const level =
@@ -100,49 +96,57 @@ export default async function ForecastPage({ searchParams }: PageProps<"/predicc
       ? headlineHour(result.forecast, result.forecast.date === today, currentHour).level
       : undefined;
 
+  const picker = (
+    <StationPicker
+      stations={stations}
+      markers={markers}
+      incidents={incidents?.incidents}
+      selected={station}
+      date={date}
+      minDate={minDate}
+      maxDate={maxDate}
+    />
+  );
+
+  if (!station) {
+    return (
+      <PageShell>
+        <Sky />
+        <header className="pt-6 text-center sm:pt-10">
+          <p className="animate-rise text-sm font-bold tracking-wider text-accent uppercase">
+            Previsión por tramo
+          </p>
+          <h1 className="stagger-1 mt-2 animate-rise font-display text-4xl font-extrabold sm:text-5xl">
+            ¿Por dónde vas a pasar?
+          </h1>
+          <p className="stagger-2 mx-auto mt-3 max-w-xl animate-rise text-lg text-ink-soft">
+            Toca tu tramo en el mapa de la isla y elige el sentido. Si lo prefieres, búscalo por
+            nombre en la lista.
+          </p>
+        </header>
+        {unknownStation && (
+          <Notice tone="info" title="Ese punto de medida no está en la lista">
+            Elige otro en el mapa o en la lista.
+          </Notice>
+        )}
+        {stations.length > 0 ? (
+          <div className="stagger-3 animate-rise">{picker}</div>
+        ) : (
+          <Notice tone="info" title="Todavía no hay estaciones con previsión">
+            El modelo aún no está publicado. Vuelve a intentarlo más tarde.
+          </Notice>
+        )}
+      </PageShell>
+    );
+  }
+
   return (
     <PageShell>
       <Sky level={level} />
 
-      {station && (
-        <details
-          className="glass group mx-auto w-full max-w-xl p-0"
-          open={!(result && "forecast" in result)}
-        >
-          <summary className="flex min-h-12 cursor-pointer list-none items-center gap-2 px-4 py-2 font-semibold [&::-webkit-details-marker]:hidden">
-            <MapPin aria-hidden="true" className="size-5 shrink-0 text-accent" />
-            <span className="min-w-0 flex-1 truncate">
-              <span className="sr-only">Cambiar punto de medida o día. Ahora: </span>
-              {stationLabel(station)}
-            </span>
-            <ChevronDown
-              aria-hidden="true"
-              className="size-5 shrink-0 transition-transform duration-200 group-open:rotate-180"
-            />
-          </summary>
-          <div className="border-t border-glass-line p-4">
-            <ForecastForm
-              stations={stations}
-              selected={stationKey(station)}
-              date={date}
-              minDate={minDate}
-              maxDate={maxDate}
-            />
-          </div>
-        </details>
-      )}
-
-      {unknownStation && (
-        <Notice tone="info" title="Ese punto de medida no está en la lista">
-          Te mostramos {station ? stationLabel(station) : "otro punto"} en su lugar.
-        </Notice>
-      )}
-
-      {!station && (
-        <Notice tone="info" title="Todavía no hay estaciones con previsión">
-          El modelo aún no está publicado. Vuelve a intentarlo más tarde.
-        </Notice>
-      )}
+      <StationSwitcher key={stationKey(station)} station={station}>
+        {picker}
+      </StationSwitcher>
 
       {result && "error" in result && (
         <Notice tone="error" title="No hay previsión para esta consulta">
@@ -150,22 +154,27 @@ export default async function ForecastPage({ searchParams }: PageProps<"/predicc
         </Notice>
       )}
 
-      {station && (
-        <Suspense fallback={null}>
-          <NearbyIncidents station={station} date={date} today={today} />
-        </Suspense>
-      )}
+      <Suspense fallback={null}>
+        <NearbyIncidents station={station} date={date} today={today} />
+      </Suspense>
 
       {result && "forecast" in result ? (
-        <TrafficWeather
-          forecast={result.forecast}
-          days={result.days}
-          today={today}
-          currentHour={currentHour}
-        />
+        <ViewTransition
+          key={`${stationKey(station)}/${date}`}
+          enter="page-enter"
+          exit="page-exit"
+          default="none"
+        >
+          <TrafficWeather
+            forecast={result.forecast}
+            days={result.days}
+            today={today}
+            currentHour={currentHour}
+          />
+        </ViewTransition>
       ) : (
         <h1 className="pt-4 font-display text-3xl font-extrabold sm:text-4xl">
-          Previsión por estación
+          Previsión por tramo
         </h1>
       )}
     </PageShell>
@@ -173,5 +182,9 @@ export default async function ForecastPage({ searchParams }: PageProps<"/predicc
 }
 
 function PageShell({ children }: { children: React.ReactNode }) {
-  return <div className="mx-auto max-w-5xl space-y-4 px-4 pt-2 sm:px-6">{children}</div>;
+  return (
+    <PageTransition>
+      <div className="mx-auto max-w-5xl space-y-4 px-4 pt-2 sm:px-6">{children}</div>
+    </PageTransition>
+  );
 }

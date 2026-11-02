@@ -6,7 +6,7 @@ const link = "underline-offset-4 hover:text-ink hover:underline";
 
 export function SiteFooter() {
   return (
-    <footer className="mx-auto mt-20 max-w-5xl px-3 pb-8 sm:px-6">
+    <footer className="mx-auto mt-24 max-w-6xl px-3 pb-8 sm:px-6">
       <div className="glass grid gap-10 p-6 sm:p-10 md:grid-cols-[1.4fr_1fr_1fr]">
         <div className="space-y-3">
           <Logo />

@@ -31,7 +31,7 @@ export function AppPromo({
   forecast?: DayForecast;
 }) {
   return (
-    <section id="app" aria-labelledby="app-title" className="scroll-mt-24">
+    <section id="app" aria-labelledby="app-title" className="reveal scroll-mt-24">
       <div className="glass overflow-hidden">
         <div className="grid items-center gap-10 px-6 py-12 sm:px-10 md:grid-cols-[1.15fr_1fr] md:py-16 lg:px-14">
           <div>
@@ -71,7 +71,7 @@ export function AppPromo({
               )}
             </div>
           </div>
-          <div className="flex justify-center md:justify-end">
+          <div className="flex animate-float justify-center motion-reduce:animate-none md:justify-end">
             <PhoneMockup forecast={forecast} />
           </div>
         </div>
