@@ -42,3 +42,11 @@ por un servicio comercial ni pedir claves que acaben en el navegador.
   porque el modelo no se entrenó para eso.
 - El servidor público de OSRM no tiene garantías de servicio. Si falla, la página y el asistente lo
   dicen y el resto de la web sigue funcionando.
+- Las coordenadas de cada lugar importan: OSRM lleva el punto a la vía más cercana, y si esa vía es
+  un vial interno la ruta puede dar un rodeo. Pasó con el Aeropuerto Sur (salía por Los Abrigos y
+  El Médano: 1 h 05 hacia el Norte en vez de unos 48 min), y por eso los aeropuertos van en su vía
+  de acceso. La API avisa en el log cuando un lugar queda a más de 150 m de la carretera.
+- Las obras solo aparecen si la DGT las publica. Las carreteras de Tenerife las gestiona el
+  Cabildo, que publica sus incidencias como datos abiertos históricos (por años), no en directo,
+  así que obras como las de la TF-1 a la altura de Las Caletillas pueden no salir aunque Google
+  Maps (que también usa avisos de conductores) sí las marque.
