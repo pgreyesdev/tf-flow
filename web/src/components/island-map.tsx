@@ -16,6 +16,7 @@ import { formatPercent } from "@/lib/format";
 import { incidentPlace, incidentSince, incidentsNear, incidentTitle } from "@/lib/incidents";
 import { LEVEL_INFO } from "@/lib/levels";
 import type { MapMarker } from "@/lib/map";
+import { addWarningIcon, WARNING_ICON } from "@/lib/warning-icon";
 
 /** Los mismos colores que el resto de la web (globals.css). WebGL no lee variables CSS. */
 export const LEVEL_COLORS: Record<Level, string> = {
@@ -39,7 +40,7 @@ const TERRAIN: RasterDEMSourceSpecification = {
 /** Estaciones sin previsión de esta hora: el azul de los enlaces, que no es ningún nivel. */
 const UNKNOWN_COLOR = "#7dd3fc";
 
-/** Las incidencias van en blanco con borde naranja: no se confunden con ningún nivel. */
+/** Naranja de las incidencias: el borde de las estaciones con una cerca y la señal de peligro. */
 export const INCIDENT_COLOR = "#fb923c";
 
 const NO_INCIDENTS: Incident[] = [];
@@ -347,18 +348,33 @@ export function IslandMap({
             },
           });
           map.addSource("incidents", { type: "geojson", data: incidentsGeoJson(incidents) });
-          map.addLayer({
-            id: "incidents",
-            type: "circle",
-            source: "incidents",
-            paint: {
-              "circle-color": "#ffffff",
-              "circle-radius": ["interpolate", ["linear"], ["zoom"], 8, 4, 11, 7, 13, 10],
-              "circle-stroke-color": INCIDENT_COLOR,
-              "circle-stroke-width": 3,
-              "circle-pitch-alignment": "viewport",
-            },
-          });
+          // Las incidencias llevan la señal de peligro; si no se puede dibujar, un círculo.
+          if (addWarningIcon(map)) {
+            map.addLayer({
+              id: "incidents",
+              type: "symbol",
+              source: "incidents",
+              layout: {
+                "icon-image": WARNING_ICON,
+                "icon-size": ["interpolate", ["linear"], ["zoom"], 8, 0.85, 11, 1.1, 13, 1.35],
+                "icon-allow-overlap": true,
+                "icon-pitch-alignment": "viewport",
+              },
+            });
+          } else {
+            map.addLayer({
+              id: "incidents",
+              type: "circle",
+              source: "incidents",
+              paint: {
+                "circle-color": "#ffffff",
+                "circle-radius": ["interpolate", ["linear"], ["zoom"], 8, 4, 11, 7, 13, 10],
+                "circle-stroke-color": INCIDENT_COLOR,
+                "circle-stroke-width": 3,
+                "circle-pitch-alignment": "viewport",
+              },
+            });
+          }
           map.on("click", "incidents", (event) => {
             const feature = event.features?.[0];
             const incident = feature && incidentsById.get(String(feature.properties.id));
