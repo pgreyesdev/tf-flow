@@ -4,6 +4,7 @@ Las 31 cabeceras municipales y los destinos más habituales. Las coordenadas son
 servidor de rutas lleva cada punto a la carretera más cercana.
 """
 
+import math
 import unicodedata
 from typing import Final
 
@@ -97,3 +98,16 @@ def find_place(query: str) -> Place | None:
         matches = [p for p in PLACES if wanted in fold(p.name)]
     # Ante varias, la de nombre más corto: «La Laguna» es San Cristóbal de La Laguna.
     return min(matches, key=lambda p: len(p.name), default=None)
+
+
+def distance_km(latitude: float, longitude: float, place: Place) -> float:
+    """Distancia en línea recta, en kilómetros, de un punto a un lugar."""
+    lat1, lat2 = math.radians(latitude), math.radians(place.latitude)
+    dlat, dlon = lat2 - lat1, math.radians(place.longitude - longitude)
+    a = math.sin(dlat / 2) ** 2 + math.cos(lat1) * math.cos(lat2) * math.sin(dlon / 2) ** 2
+    return 2 * 6371.0 * math.asin(math.sqrt(a))
+
+
+def nearest_place(latitude: float, longitude: float) -> Place:
+    """El lugar conocido más cercano a un punto, para decir «cerca de Adeje»."""
+    return min(PLACES, key=lambda place: distance_km(latitude, longitude, place))

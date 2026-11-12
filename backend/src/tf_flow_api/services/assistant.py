@@ -18,6 +18,8 @@ from openai.types.responses import FunctionToolParam, Response, ResponseInputIte
 from pydantic import BaseModel, Field, ValidationError, field_validator
 
 from tf_flow_api.domain.chat import ChatMessage, ChatReply
+from tf_flow_api.domain.incidents import Incident
+from tf_flow_api.domain.routes import Place
 from tf_flow_api.services.forecast import (
     DateOutOfRangeError,
     ForecastService,
@@ -25,7 +27,7 @@ from tf_flow_api.services.forecast import (
     today_in_tenerife,
 )
 from tf_flow_api.services.incidents import IncidentService
-from tf_flow_api.services.places import PLACES, find_place
+from tf_flow_api.services.places import PLACES, distance_km, find_place, nearest_place
 from tf_flow_api.services.routes import RouteService, RoutingUnavailableError
 
 logger = logging.getLogger(__name__)
@@ -33,6 +35,8 @@ logger = logging.getLogger(__name__)
 Effort = Literal["low", "medium", "high"]
 MAX_TOOL_ROUNDS = 6
 MAX_OUTPUT_TOKENS = 4_096
+#: Radio alrededor de un lugar dentro del que una incidencia cuenta como «en» ese lugar.
+NEAR_PLACE_KM = 5.0
 WEEKDAYS = ("lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo")
 
 SYSTEM_PROMPT = """\
@@ -50,6 +54,11 @@ que des la previsión de hoy o de los próximos días para una vía, consulta ta
 de la DGT en esa vía. Si hay alguna, empieza la respuesta avisando de ella (qué es, dónde y desde \
 cuándo) y recuerda que la previsión no la tiene en cuenta. Los niveles son low (fluido), medium \
 (denso) y high (atasco fuerte). Las horas son locales de Canarias.
+
+Si preguntan si hay accidentes, obras, cortes o retenciones en una vía o un lugar, consulta \
+get_incidents con esa vía o ese lugar. Si hay alguna, di qué es, dónde (vía, kilómetro y \
+municipio) y desde cuándo; si no hay ninguna, di que la DGT no tiene ninguna comunicada ahí ahora \
+mismo, sin inventar nada. Cita a la DGT como fuente.
 
 Si preguntan cómo ir de un sitio a otro o por una alternativa a una vía, usa plan_route. Explica \
 cuál recomiendas y por qué (atascos previstos en sus aforos, incidencias, tiempo), recuerda que \
@@ -99,9 +108,16 @@ TOOLS: list[FunctionToolParam] = [
     _tool(
         "get_incidents",
         "Incidencias de tráfico activas ahora mismo en Tenerife según la DGT (accidentes, obras, "
-        "retenciones, cortes): tipo, vía, punto kilométrico, municipio y desde cuándo. Filtra por "
-        "vía, como 'TF-5'; con una cadena vacía devuelve todas.",
-        {"road": {"type": "string", "description": "Vía, como 'TF-1', o vacío"}},
+        "retenciones, cortes): tipo, vía, punto kilométrico, municipio, lugar conocido más "
+        "cercano y desde cuándo. Filtra por vía, como 'TF-5', por lugar, como 'La Laguna' o "
+        "'Los Cristianos' (su municipio y alrededores), o por ambos; vacíos devuelven todas.",
+        {
+            "road": {"type": "string", "description": "Vía, como 'TF-1', o vacío"},
+            "place": {
+                "type": "string",
+                "description": "Municipio o lugar de Tenerife, como 'Adeje', o vacío",
+            },
+        },
     ),
     _tool(
         "plan_route",
@@ -133,6 +149,7 @@ class _FindStations(BaseModel):
 
 class _Incidents(BaseModel):
     road: str = Field(default="", max_length=20)
+    place: str = Field(default="", max_length=80)
 
 
 class _PlanRoute(BaseModel):
@@ -161,6 +178,13 @@ def _fold(text: str) -> str:
     """Minúsculas y sin tildes, para buscar 'guimar' y encontrar 'GÜÍMAR'."""
     decomposed = unicodedata.normalize("NFKD", text.casefold())
     return "".join(c for c in decomposed if not unicodedata.combining(c))
+
+
+def _near(incident: Incident, place: Place) -> bool:
+    """La incidencia está en el municipio del lugar o a pocos kilómetros de él."""
+    if incident.municipality and _fold(incident.municipality) == _fold(place.name):
+        return True
+    return distance_km(incident.latitude, incident.longitude, place) <= NEAR_PLACE_KM
 
 
 def _road(text: str) -> str:
@@ -366,6 +390,12 @@ class AssistantService:
         return json.dumps(summary, ensure_ascii=False)
 
     async def _incidents_summary(self, request: _Incidents) -> str:
+        place = None
+        if request.place.strip():
+            place = find_place(request.place)
+            if place is None:
+                names = ", ".join(p.name for p in PLACES)
+                return f"ERROR: no conozco el lugar «{request.place}». Lugares disponibles: {names}"
         now = await self.incidents.current()
         if not now.available:
             return "ERROR: ahora mismo no se pueden consultar las incidencias de la DGT"
@@ -377,13 +407,22 @@ class AssistantService:
                 "via": i.road,
                 "km": i.kilometer,
                 "municipio": i.municipality,
+                "cerca_de": nearest_place(i.latitude, i.longitude).name,
                 "desde": i.start.isoformat(timespec="minutes") if i.start else None,
                 "hasta": i.end.isoformat(timespec="minutes") if i.end else None,
             }
             for i in now.incidents
-            if not road or _road(i.road or "") == road
+            if (not road or _road(i.road or "") == road) and (place is None or _near(i, place))
         ]
-        return json.dumps({"incidencias": found[:30], "total": len(found)}, ensure_ascii=False)
+        summary: dict[str, Any] = {
+            "incidencias": found[:30],
+            "total": len(found),
+            "actualizado": now.updated.isoformat(timespec="minutes") if now.updated else None,
+            "fuente": now.source,
+        }
+        if place is not None:
+            summary["lugar"] = place.name
+        return json.dumps(summary, ensure_ascii=False)
 
     def _forecast_summary(self, request: _DayForecast) -> str:
         """Resumen compacto de la previsión: lo justo para responder, con pocos tokens."""
