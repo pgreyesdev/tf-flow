@@ -1,6 +1,5 @@
 import {
   ApiError,
-  askAssistant,
   getDayForecast,
   getModelInfo,
   getIncidents,
@@ -8,6 +7,7 @@ import {
   getRoutes,
   getNetworkNow,
   getStations,
+  streamAssistant,
 } from "@/lib/api/client";
 import { getHomeData } from "@/lib/api/featured";
 import { dayForecast, INCIDENTS, MODEL, ROUTE_PLAN, STATIONS } from "@/test/fixtures";
@@ -128,21 +128,45 @@ describe("API client", () => {
     await expect(getStations()).rejects.toMatchObject({ kind: "unavailable" });
   });
 
-  it("sends the assistant token only when configured", async () => {
-    const reply = { reply: "Hola", tools_used: [], tokens_used: 10 };
-    const fetchMock = mockFetch(() => json(reply));
+  it("opens the assistant stream and sends the token only when configured", async () => {
+    const fetchMock = mockFetch(
+      () => new Response('data: {"type":"delta","text":"Hola"}\n\n', { status: 200 }),
+    );
     const messages = [{ role: "user" as const, content: "¿Hola?" }];
 
-    await expect(askAssistant(messages)).resolves.toEqual(reply);
+    const body = await streamAssistant(messages);
+    expect(await new Response(body).text()).toBe('data: {"type":"delta","text":"Hola"}\n\n');
+    expect(String(fetchMock.mock.calls[0]![0])).toBe(
+      "http://api.test/api/v1/assistant/chat/stream",
+    );
     let init = fetchMock.mock.calls[0]![1]!;
     expect(init.method).toBe("POST");
     expect(init.headers).not.toHaveProperty("X-Assistant-Token");
     expect(JSON.parse(String(init.body))).toEqual({ messages });
 
     vi.stubEnv("TFFLOW_ASSISTANT_TOKEN", "secreto");
-    await askAssistant(messages);
+    const visitor = new AbortController();
+    await streamAssistant(messages, visitor.signal);
     init = fetchMock.mock.calls[1]![1]!;
     expect(init.headers).toHaveProperty("X-Assistant-Token", "secreto");
+    visitor.abort();
+    expect(init.signal?.aborted).toBe(true);
+  });
+
+  it("reports assistant errors before the stream starts", async () => {
+    mockFetch(() => json({ detail: "sin presupuesto" }, 503));
+    await expect(streamAssistant([{ role: "user", content: "a" }])).rejects.toMatchObject({
+      kind: "unavailable",
+      message: "sin presupuesto",
+    });
+    mockFetch(() => Promise.reject(new TypeError("fetch failed")));
+    await expect(streamAssistant([{ role: "user", content: "a" }])).rejects.toMatchObject({
+      kind: "unavailable",
+    });
+    mockFetch(() => new Response(null, { status: 200 }));
+    await expect(streamAssistant([{ role: "user", content: "a" }])).rejects.toMatchObject({
+      kind: "invalid_response",
+    });
   });
 
   it("refuses a malformed API address", async () => {

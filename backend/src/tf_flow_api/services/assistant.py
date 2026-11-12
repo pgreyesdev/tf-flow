@@ -8,7 +8,8 @@ import datetime as dt
 import json
 import logging
 import unicodedata
-from collections.abc import Callable
+from collections.abc import AsyncGenerator, AsyncIterator, Callable
+from contextlib import aclosing
 from typing import Any, Literal, cast
 from urllib.parse import urlencode
 
@@ -17,7 +18,15 @@ from openai.resources.responses import AsyncResponses
 from openai.types.responses import FunctionToolParam, Response, ResponseInputItemParam
 from pydantic import BaseModel, Field, ValidationError, field_validator
 
-from tf_flow_api.domain.chat import ChatMessage, ChatReply
+from tf_flow_api.domain.chat import (
+    ChatEvent,
+    ChatMessage,
+    ChatReply,
+    DeltaEvent,
+    DoneEvent,
+    ReplaceEvent,
+    ToolEvent,
+)
 from tf_flow_api.services.forecast import (
     DateOutOfRangeError,
     ForecastService,
@@ -223,6 +232,31 @@ class AssistantService:
         self.budget = budget
 
     async def reply(self, history: list[ChatMessage]) -> ChatReply:
+        """La respuesta completa de una vez: junta los eventos de :meth:`stream`."""
+        text = ""
+        done: DoneEvent | None = None
+        async with aclosing(self.stream(history)) as events:
+            async for event in events:
+                match event:
+                    case DeltaEvent():
+                        text += event.text
+                    case ReplaceEvent():
+                        text = event.text
+                    case DoneEvent():
+                        done = event
+        if done is None:  # pragma: no cover - stream() siempre termina con DoneEvent
+            raise AssistantUnavailableError("El asistente no terminó la respuesta")
+        return ChatReply(
+            reply=text.strip(), tools_used=done.tools_used, tokens_used=done.tokens_used
+        )
+
+    async def stream(self, history: list[ChatMessage]) -> AsyncGenerator[ChatEvent]:
+        """Responde según el modelo va generando el texto.
+
+        Emite un :class:`ToolEvent` por cada herramienta que consulta, un :class:`DeltaEvent` por
+        cada trozo de texto y termina siempre con un :class:`DoneEvent`. Lanza
+        :class:`AssistantUnavailableError` si el proveedor falla, también a mitad de respuesta.
+        """
         if self.budget.exhausted():
             raise AssistantUnavailableError("El asistente ha agotado su presupuesto de hoy")
         today = self.forecast.today()
@@ -239,48 +273,68 @@ class AssistantService:
         )
         tools_used: list[str] = []
         tokens = 0
-        for _ in range(MAX_TOOL_ROUNDS):
-            response = await self._create(conversation)
-            tokens += response.usage.total_tokens if response.usage else 0
-            if _refused(response):
-                self.budget.spend(tokens)
-                return ChatReply(reply=UNAVAILABLE_REPLY, tools_used=tools_used, tokens_used=tokens)
-            calls = [item for item in response.output if item.type == "function_call"]
-            if not calls:
-                self.budget.spend(tokens)
-                return ChatReply(
-                    reply=response.output_text.strip() or UNAVAILABLE_REPLY,
-                    tools_used=tools_used,
-                    tokens_used=tokens,
-                )
-            # Se devuelve la salida completa (con el razonamiento cifrado) sin tocarla.
-            conversation.extend(
-                cast(
-                    ResponseInputItemParam,
-                    item.model_dump(mode="json", by_alias=True, exclude_none=True),
-                )
-                for item in response.output
-            )
-            for call in calls:
-                tools_used.append(call.name)
-                conversation.append(
-                    {
-                        "type": "function_call_output",
-                        "call_id": call.call_id,
-                        "output": await self._run_tool(call.name, call.arguments),
-                    }
-                )
-        self.budget.spend(tokens)
-        logger.warning("El asistente agotó las %s rondas de herramientas", MAX_TOOL_ROUNDS)
-        return ChatReply(
-            reply="La consulta es demasiado compleja. ¿Puedes concretar la vía y el día?",
-            tools_used=tools_used,
-            tokens_used=tokens,
-        )
-
-    async def _create(self, conversation: list[ResponseInputItemParam]) -> Response:
+        said = ""
         try:
-            return await self.responses.create(
+            for _ in range(MAX_TOOL_ROUNDS):
+                response: Response | None = None
+                round_text = ""
+                async for chunk in self._create(conversation):
+                    if isinstance(chunk, Response):
+                        response = chunk
+                        continue
+                    if said and not round_text:
+                        # Ya hubo texto antes de consultar herramientas: párrafo nuevo.
+                        yield DeltaEvent(text="\n\n")
+                    round_text += chunk
+                    said += chunk
+                    yield DeltaEvent(text=chunk)
+                if response is None:
+                    raise AssistantUnavailableError("El asistente no terminó la respuesta")
+                tokens += response.usage.total_tokens if response.usage else 0
+                if _refused(response):
+                    yield ReplaceEvent(text=UNAVAILABLE_REPLY)
+                    yield DoneEvent(tools_used=tools_used, tokens_used=tokens)
+                    return
+                calls = [item for item in response.output if item.type == "function_call"]
+                if not calls:
+                    if not said.strip():
+                        yield ReplaceEvent(text=UNAVAILABLE_REPLY)
+                    yield DoneEvent(tools_used=tools_used, tokens_used=tokens)
+                    return
+                # Se devuelve la salida completa (con el razonamiento cifrado) sin tocarla.
+                conversation.extend(
+                    cast(
+                        ResponseInputItemParam,
+                        item.model_dump(mode="json", by_alias=True, exclude_none=True),
+                    )
+                    for item in response.output
+                )
+                for call in calls:
+                    tools_used.append(call.name)
+                    yield ToolEvent(name=call.name)
+                    conversation.append(
+                        {
+                            "type": "function_call_output",
+                            "call_id": call.call_id,
+                            "output": await self._run_tool(call.name, call.arguments),
+                        }
+                    )
+            logger.warning("El asistente agotó las %s rondas de herramientas", MAX_TOOL_ROUNDS)
+            yield ReplaceEvent(
+                text="La consulta es demasiado compleja. ¿Puedes concretar la vía y el día?"
+            )
+            yield DoneEvent(tools_used=tools_used, tokens_used=tokens)
+        finally:
+            # También si la persona cierra la página a mitad: lo ya gastado cuenta.
+            self.budget.spend(tokens)
+
+    async def _create(
+        self, conversation: list[ResponseInputItemParam]
+    ) -> AsyncIterator[str | Response]:
+        """Una ronda con el modelo en streaming: los trozos de texto según llegan y, al final, la
+        respuesta completa (con las llamadas a herramientas y el gasto de tokens)."""
+        try:
+            stream = await self.responses.create(
                 model=self.model,
                 instructions=SYSTEM_PROMPT,
                 input=conversation,
@@ -290,10 +344,23 @@ class AssistantService:
                 # Sin guardar nada en OpenAI; el razonamiento viaja cifrado entre rondas.
                 store=False,
                 include=["reasoning.encrypted_content"],
+                stream=True,
             )
+            try:
+                async for event in stream:
+                    match event.type:
+                        case "response.output_text.delta":
+                            yield event.delta
+                        case "response.completed" | "response.incomplete":
+                            yield event.response
+                        case "response.failed" | "error":
+                            logger.error("OpenAI cortó la respuesta: %s", event)
+                            raise AssistantUnavailableError("El asistente no está disponible")
+            finally:
+                await stream.close()
         except openai.RateLimitError as error:
             raise AssistantUnavailableError("El asistente está saturado") from error
-        except (openai.APIStatusError, openai.APIConnectionError) as error:
+        except openai.APIError as error:
             logger.exception("Error llamando a OpenAI")
             raise AssistantUnavailableError("El asistente no está disponible") from error
 

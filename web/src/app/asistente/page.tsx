@@ -5,8 +5,6 @@ import type { Metadata } from "next";
 
 import { Chat } from "@/components/chat";
 
-import { sendToAssistant } from "./actions";
-
 export const metadata: Metadata = {
   title: "Asistente",
   description: "Pregunta en lenguaje natural por el tráfico previsto en Tenerife.",
@@ -25,7 +23,7 @@ export default function AssistantPage() {
           </p>
         </header>
 
-        <Chat send={sendToAssistant} />
+        <Chat />
 
         <aside aria-labelledby="privacy-title" className="glass flex gap-3 p-4 text-sm sm:p-5">
           <ShieldCheck aria-hidden="true" className="mt-0.5 size-5 shrink-0 text-accent" />
