@@ -481,3 +481,40 @@ async def test_plans_routes_with_a_link_to_the_map(
         "&fecha=2025-06-02&hora=8"
     )
     assert tool_output(fake.calls[4]).startswith("ERROR: Solo se planifican rutas")
+
+
+async def test_finds_incidents_by_place(
+    forecast: ForecastService, incidents: IncidentService
+) -> None:
+    fake = FakeResponses(
+        tool_call("get_incidents", {"road": "", "place": "la laguna"}),
+        tool_call("get_incidents", {"road": "", "place": "Candelaria"}, call_id="call_2"),
+        tool_call("get_incidents", {"road": "TF-1", "place": "Los Cristianos"}, call_id="call_3"),
+        text("Hay un accidente en la TF-5 a la altura de La Laguna."),
+    )
+
+    await service(forecast, fake, incidents=incidents).reply(ASK)
+
+    in_la_laguna = json.loads(tool_output(fake.calls[1]))
+    assert in_la_laguna["lugar"] == "San Cristóbal de La Laguna"
+    assert in_la_laguna["total"] == 1
+    assert in_la_laguna["incidencias"][0]["tipo"] == "Accidente"
+    assert in_la_laguna["incidencias"][0]["cerca_de"] == "San Cristóbal de La Laguna"
+    assert "DGT" in in_la_laguna["fuente"]
+    assert json.loads(tool_output(fake.calls[2]))["total"] == 0
+    # Por cercanía, aunque el municipio de la incidencia sea Arona.
+    near_cristianos = json.loads(tool_output(fake.calls[3]))
+    assert near_cristianos["total"] == 1
+    assert near_cristianos["incidencias"][0]["municipio"] == "Arona"
+
+
+async def test_unknown_places_go_back_to_the_model(
+    forecast: ForecastService, incidents: IncidentService
+) -> None:
+    fake = FakeResponses(
+        tool_call("get_incidents", {"road": "", "place": "Madrid"}), text("¿Dónde, exactamente?")
+    )
+
+    await service(forecast, fake, incidents=incidents).reply(ASK)
+
+    assert tool_output(fake.calls[1]).startswith("ERROR: no conozco el lugar «Madrid»")

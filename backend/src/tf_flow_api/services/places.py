@@ -1,9 +1,12 @@
 """Lugares de Tenerife que se pueden usar como origen o destino de una ruta.
 
 Las 31 cabeceras municipales y los destinos más habituales. Las coordenadas son aproximadas: el
-servidor de rutas lleva cada punto a la carretera más cercana.
+servidor de rutas lleva cada punto a la carretera más cercana. Por eso los aeropuertos no van en
+el centro de la terminal, sino en su vía de acceso: desde el centro, OSRM se engancha a los viales
+internos y la ruta da un rodeo (en el Sur, por Los Abrigos y El Médano: unos 20 minutos de más).
 """
 
+import math
 import unicodedata
 from typing import Final
 
@@ -58,8 +61,8 @@ PLACES: Final[list[Place]] = sorted(
             ("Tegueste", 28.5180, -16.3380),
             ("Vilaflor", 28.1570, -16.6370),
             # Destinos habituales.
-            ("Aeropuerto Tenerife Norte", 28.4827, -16.3415),
-            ("Aeropuerto Tenerife Sur", 28.0445, -16.5725),
+            ("Aeropuerto Tenerife Norte", 28.4840, -16.3390),  # Acceso por la TF-152.
+            ("Aeropuerto Tenerife Sur", 28.0490, -16.5725),  # Glorietas de acceso desde la TF-1.
             ("Bajamar", 28.5530, -16.3460),
             ("Costa Adeje", 28.0850, -16.7380),
             ("El Médano", 28.0440, -16.5370),
@@ -97,3 +100,16 @@ def find_place(query: str) -> Place | None:
         matches = [p for p in PLACES if wanted in fold(p.name)]
     # Ante varias, la de nombre más corto: «La Laguna» es San Cristóbal de La Laguna.
     return min(matches, key=lambda p: len(p.name), default=None)
+
+
+def distance_km(latitude: float, longitude: float, place: Place) -> float:
+    """Distancia en línea recta, en kilómetros, de un punto a un lugar."""
+    lat1, lat2 = math.radians(latitude), math.radians(place.latitude)
+    dlat, dlon = lat2 - lat1, math.radians(place.longitude - longitude)
+    a = math.sin(dlat / 2) ** 2 + math.cos(lat1) * math.cos(lat2) * math.sin(dlon / 2) ** 2
+    return 2 * 6371.0 * math.asin(math.sqrt(a))
+
+
+def nearest_place(latitude: float, longitude: float) -> Place:
+    """El lugar conocido más cercano a un punto, para decir «cerca de Adeje»."""
+    return min(PLACES, key=lambda place: distance_km(latitude, longitude, place))
