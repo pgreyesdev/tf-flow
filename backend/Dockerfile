@@ -9,8 +9,10 @@ COPY ml ./ml
 RUN uv sync --frozen --no-dev --package tf-flow-api
 
 FROM python:3.12-slim
-# LightGBM necesita la biblioteca de OpenMP en tiempo de ejecución.
+# LightGBM necesita la biblioteca de OpenMP en tiempo de ejecución. El upgrade recoge los parches
+# de seguridad de Debian que aún no han llegado a la imagen base de Python.
 RUN apt-get update \
+    && apt-get upgrade -y --no-install-recommends \
     && apt-get install -y --no-install-recommends libgomp1 \
     && rm -rf /var/lib/apt/lists/* \
     && useradd --create-home --uid 10001 app

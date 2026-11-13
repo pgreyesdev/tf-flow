@@ -41,6 +41,9 @@ que se pueda usar legalmente:
   («Obras en la TF-82, cerca de este punto»): hoy, con cualquier incidencia activa; otro día, con
   las obras y cortes que según la DGT seguirán ese día. El asistente consulta las incidencias de la
   vía cada vez que da una previsión y, si hay alguna, empieza avisando de ella.
+  También responde a preguntas directas («¿hay algún accidente en La Laguna?»): filtra por vía o
+  por lugar (el municipio de la incidencia o a menos de 5 km del lugar) y, si no hay nada, dice
+  que la DGT no tiene ninguna comunicada ahí en ese momento.
 - **No entran en el modelo.** La previsión sigue siendo la del modelo entrenado; la web avisa de que
   una incidencia cercana puede hacer que haya más tráfico del previsto.
 
