@@ -14,6 +14,7 @@ La API sirve las previsiones del modelo final. Todas las rutas cuelgan de `/api/
 | `GET /routes?origin=…&destination=…&date=AAAA-MM-DD&hour=8` | Rutas alternativas con la previsión de sus aforos y las incidencias ([ADR 0012](adr/0012-rutas-alternativas.md)) |
 | `GET /model` | Último dato con el que se entrenó, umbral de aviso y métricas en test |
 | `POST /assistant/chat` | Respuesta del asistente conversacional ([ADR 0009](adr/0009-asistente-openai.md)) |
+| `POST /assistant/chat/stream` | La misma respuesta, en streaming según la genera el modelo |
 
 ## Incidencias
 
@@ -115,6 +116,34 @@ El historial lo guarda el cliente y se envía completo en cada pregunta, alterna
 503. Si se define `TFFLOW_ASSISTANT_ACCESS_TOKEN`, hay que enviar ese valor en la cabecera
 `X-Assistant-Token`. Responde 429 al superar `TFFLOW_ASSISTANT_RATE_LIMIT_PER_MINUTE` preguntas por
 minuto y 503 cuando se agota `TFFLOW_ASSISTANT_DAILY_TOKEN_BUDGET`.
+
+### En streaming
+
+`POST /api/v1/assistant/chat/stream` recibe el mismo cuerpo, pero responde con Server-Sent Events
+(`text/event-stream`): una línea `data: {json}` por evento, separadas por una línea en blanco. La web
+usa esta versión para que el texto aparezca según lo escribe el modelo.
+
+```text
+data: {"type": "tool", "name": "get_incidents"}
+
+data: {"type": "delta", "text": "Hay un "}
+
+data: {"type": "delta", "text": "accidente en la TF-5"}
+
+data: {"type": "done", "tools_used": ["get_incidents"], "tokens_used": 5120}
+```
+
+| `type` | Qué significa |
+|---|---|
+| `tool` | El asistente consulta una herramienta (`name`); útil para enseñar qué está haciendo |
+| `delta` | Un trozo más del texto (`text`), que se añade a lo recibido |
+| `replace` | Sustituye todo el texto recibido (`text`): negativas del modelo o consultas demasiado largas |
+| `done` | Fin de la respuesta, con las herramientas usadas y los tokens gastados |
+| `error` | El proveedor falló a mitad de respuesta (`detail`); lo recibido no vale |
+
+Los errores antes de empezar (token, límite por minuto, presupuesto agotado u OpenAI caído) siguen
+llegando como 401, 429 o 503 normales. Si el cliente corta la conexión, la API deja de pedir texto
+al modelo y los tokens de las rondas terminadas cuentan para el presupuesto del día.
 
 ## Protección
 

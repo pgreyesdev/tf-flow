@@ -31,3 +31,46 @@ class ChatReply(BaseModel):
     reply: str
     tools_used: list[str] = Field(description="Herramientas que consultó el asistente")
     tokens_used: int
+
+
+# Eventos de la respuesta en streaming (``POST /assistant/chat/stream``). Cada uno viaja como una
+# línea ``data: {json}`` de Server-Sent Events; el campo ``type`` dice de cuál se trata.
+
+
+class ToolEvent(BaseModel):
+    """El asistente está consultando una herramienta."""
+
+    type: Literal["tool"] = "tool"
+    name: str
+
+
+class DeltaEvent(BaseModel):
+    """Un trozo más del texto de la respuesta, tal como lo genera el modelo."""
+
+    type: Literal["delta"] = "delta"
+    text: str
+
+
+class ReplaceEvent(BaseModel):
+    """Sustituye todo el texto recibido hasta ahora (negativas o consultas demasiado largas)."""
+
+    type: Literal["replace"] = "replace"
+    text: str
+
+
+class DoneEvent(BaseModel):
+    """Fin de la respuesta."""
+
+    type: Literal["done"] = "done"
+    tools_used: list[str]
+    tokens_used: int
+
+
+class ErrorEvent(BaseModel):
+    """El asistente falló a mitad de respuesta; lo recibido hasta ahora no vale."""
+
+    type: Literal["error"] = "error"
+    detail: str
+
+
+ChatEvent = ToolEvent | DeltaEvent | ReplaceEvent | DoneEvent | ErrorEvent

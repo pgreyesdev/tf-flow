@@ -1,6 +1,8 @@
 import copy
 import datetime as dt
 import json
+import re
+from collections.abc import AsyncIterator
 from typing import Any, cast
 
 import httpx
@@ -9,7 +11,13 @@ import openai
 import pytest
 from fastapi.testclient import TestClient
 from openai.resources.responses import AsyncResponses
-from openai.types.responses import Response
+from openai.types.responses import (
+    Response,
+    ResponseCompletedEvent,
+    ResponseIncompleteEvent,
+    ResponseStreamEvent,
+    ResponseTextDeltaEvent,
+)
 from pydantic import SecretStr
 
 from tf_flow_api.core.config import Environment, Settings
@@ -83,17 +91,58 @@ def text(reply: str) -> Response:
     return say({"type": "output_text", "text": reply, "annotations": []})
 
 
+class FakeStream:
+    """Imita el streaming de OpenAI: el texto en trozos de una palabra y luego la respuesta entera.
+
+    Con ``fail`` lanza ese error después del texto, como un corte a mitad de respuesta."""
+
+    def __init__(self, response: Response, fail: Exception | None = None) -> None:
+        self.response = response
+        self.fail = fail
+        self.closed = False
+
+    async def __aiter__(self) -> AsyncIterator[ResponseStreamEvent]:
+        words = re.findall(r"\S+\s*", self.response.output_text)
+        for i, word in enumerate(words):
+            yield ResponseTextDeltaEvent(
+                type="response.output_text.delta",
+                delta=word,
+                item_id="msg_1",
+                output_index=0,
+                content_index=0,
+                logprobs=[],
+                sequence_number=i,
+            )
+        if self.fail is not None:
+            raise self.fail
+        if self.response.incomplete_details:
+            yield ResponseIncompleteEvent(
+                type="response.incomplete", response=self.response, sequence_number=len(words)
+            )
+        else:
+            yield ResponseCompletedEvent(
+                type="response.completed", response=self.response, sequence_number=len(words)
+            )
+
+    async def close(self) -> None:
+        self.closed = True
+
+
 class FakeResponses:
-    def __init__(self, *responses: Response | Exception) -> None:
+    def __init__(self, *responses: Response | FakeStream | Exception) -> None:
         self.responses = list(responses)
         self.calls: list[dict[str, Any]] = []
+        self.streams: list[FakeStream] = []
 
-    async def create(self, **kwargs: Any) -> Response:
+    async def create(self, **kwargs: Any) -> FakeStream:
+        assert kwargs["stream"] is True
         self.calls.append(copy.deepcopy(kwargs))
         item = self.responses.pop(0)
         if isinstance(item, Exception):
             raise item
-        return item
+        stream = item if isinstance(item, FakeStream) else FakeStream(item)
+        self.streams.append(stream)
+        return stream
 
 
 def service(

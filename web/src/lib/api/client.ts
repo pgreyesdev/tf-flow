@@ -6,8 +6,6 @@ import { serverEnv } from "@/lib/env";
 
 import {
   type ChatMessage,
-  type ChatReply,
-  chatReplySchema,
   type DayForecast,
   dayForecastSchema,
   type Direction,
@@ -164,20 +162,38 @@ export function getDayForecast(
   );
 }
 
-export function askAssistant(messages: ChatMessage[]): Promise<ChatReply> {
-  const token = serverEnv().TFFLOW_ASSISTANT_TOKEN;
-  return request(
-    "/api/v1/assistant/chat",
-    chatReplySchema,
-    {
+/**
+ * Abre la respuesta del asistente en streaming y devuelve el cuerpo tal cual (Server-Sent Events).
+ * Los errores antes de empezar (token, límite, presupuesto) llegan como {@link ApiError}; los de a
+ * mitad de respuesta, como un evento `error` dentro del propio flujo.
+ */
+export async function streamAssistant(
+  messages: ChatMessage[],
+  signal?: AbortSignal,
+): Promise<ReadableStream<Uint8Array>> {
+  const { TFFLOW_API_URL, TFFLOW_ASSISTANT_TOKEN: token } = serverEnv();
+  const timeout = AbortSignal.timeout(CHAT_TIMEOUT_MS);
+  let response: Response;
+  try {
+    response = await fetch(new URL("/api/v1/assistant/chat/stream", TFFLOW_API_URL), {
       method: "POST",
       cache: "no-store",
       headers: {
+        Accept: "text/event-stream",
         "Content-Type": "application/json",
         ...(token ? { "X-Assistant-Token": token } : {}),
       },
       body: JSON.stringify({ messages }),
-    },
-    CHAT_TIMEOUT_MS,
-  );
+      signal: signal ? AbortSignal.any([signal, timeout]) : timeout,
+    });
+  } catch (cause) {
+    throw new ApiError("unavailable", "No se pudo conectar con la API", undefined, { cause });
+  }
+  if (!response.ok) {
+    throw await errorFrom(response);
+  }
+  if (!response.body) {
+    throw new ApiError("invalid_response", "El asistente respondió sin contenido");
+  }
+  return response.body;
 }

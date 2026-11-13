@@ -15,9 +15,11 @@ nada que permita gastar el presupuesto del asistente o inyectar código.
   a la API desde el servidor; el navegador solo recibe HTML y el JavaScript de los componentes
   interactivos (el chat). La búsqueda de previsión es un formulario `GET`, así que funciona sin
   JavaScript y cada consulta tiene su URL.
-- **La API no se expone al navegador.** El asistente se llama con una Server Action que valida la
-  conversación con Zod, limita las preguntas por visitante y añade el token de acceso, que nunca
-  sale del servidor. Las respuestas de la API también se validan con Zod antes de pintarlas.
+- **La API no se expone al navegador.** El asistente se llama a través de una ruta de la propia web
+  (`POST /api/asistente`) que solo acepta peticiones de su mismo origen, valida la conversación con
+  Zod, limita las preguntas por visitante y añade el token de acceso, que nunca sale del servidor.
+  La ruta reenvía tal cual la respuesta en streaming de la API para que el texto aparezca según se
+  genera (antes era una Server Action, que no permite ir mostrando la respuesta a trozos). Las respuestas de la API también se validan con Zod antes de pintarlas.
 - **CSP con nonce por petición** (`script-src 'nonce-…' 'strict-dynamic'`, sin `unsafe-inline`), más
   HSTS, `nosniff`, `X-Frame-Options` y `Permissions-Policy`. Como el nonce cambia en cada petición,
   todas las páginas se generan al pedirlas y Cache Components queda desactivado: su prerenderizado

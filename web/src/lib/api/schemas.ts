@@ -143,11 +143,18 @@ export const chatMessageSchema = z.object({
 });
 export type ChatMessage = z.infer<typeof chatMessageSchema>;
 
-export const chatReplySchema = z.object({
-  reply: z.string(),
-  tools_used: z.array(z.string()),
-  tokens_used: z.number().int().nonnegative(),
-});
-export type ChatReply = z.infer<typeof chatReplySchema>;
+/** Eventos de `POST /assistant/chat/stream`: la respuesta llega a trozos según se genera. */
+export const chatEventSchema = z.discriminatedUnion("type", [
+  z.object({ type: z.literal("tool"), name: z.string() }),
+  z.object({ type: z.literal("delta"), text: z.string() }),
+  z.object({ type: z.literal("replace"), text: z.string() }),
+  z.object({
+    type: z.literal("done"),
+    tools_used: z.array(z.string()),
+    tokens_used: z.number().int().nonnegative(),
+  }),
+  z.object({ type: z.literal("error"), detail: z.string() }),
+]);
+export type ChatEvent = z.infer<typeof chatEventSchema>;
 
 export const errorBodySchema = z.object({ detail: z.unknown() }).partial();

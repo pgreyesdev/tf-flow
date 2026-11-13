@@ -5,7 +5,14 @@ import { useEffect, useId, useRef, useState, useTransition } from "react";
 
 import { RichText } from "@/components/rich-text";
 import type { ChatMessage } from "@/lib/api/schemas";
-import { type ChatResult, MAX_MESSAGE_LENGTH, TOOL_LABELS } from "@/lib/chat";
+import {
+  type ChatProgress,
+  MAX_MESSAGE_LENGTH,
+  type SendChat,
+  streamChat,
+  TOOL_ACTIVITY,
+  TOOL_LABELS,
+} from "@/lib/chat";
 import { buttonStyles, cx } from "@/lib/ui";
 
 interface Entry extends ChatMessage {
@@ -19,11 +26,14 @@ export const SUGGESTIONS = [
 ] as const;
 
 interface ChatProps {
-  send: (messages: ChatMessage[]) => Promise<ChatResult>;
+  /** Cómo se pregunta al asistente; por defecto, en streaming contra la propia web. */
+  send?: SendChat;
 }
 
-export function Chat({ send }: ChatProps) {
+export function Chat({ send = streamChat }: ChatProps) {
   const [entries, setEntries] = useState<Entry[]>([]);
+  const [live, setLive] = useState<ChatProgress | null>(null);
+  const requestRef = useRef<AbortController | null>(null);
   const [draft, setDraft] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -38,7 +48,10 @@ export function Chat({ send }: ChatProps) {
     }
     const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
     endRef.current?.scrollIntoView?.({ behavior: reduce ? "auto" : "smooth", block: "end" });
-  }, [entries, pending]);
+  }, [entries, pending, live]);
+
+  // Al salir de la página se corta la respuesta en curso: deja de gastar en el servidor.
+  useEffect(() => () => requestRef.current?.abort(), []);
 
   function submit(text: string) {
     const question = text.trim();
@@ -49,8 +62,24 @@ export function Chat({ send }: ChatProps) {
     setEntries(history);
     setDraft("");
     setError(null);
+    setLive({ text: "", toolsUsed: [] });
+    const request = new AbortController();
+    requestRef.current = request;
     startTransition(async () => {
-      const result = await send(history.map(({ role, content }) => ({ role, content })));
+      const result = await send(
+        history.map(({ role, content }) => ({ role, content })),
+        (progress) => {
+          if (!request.signal.aborted) {
+            setLive(progress);
+          }
+        },
+        request.signal,
+      );
+      if (request.signal.aborted) {
+        return;
+      }
+      requestRef.current = null;
+      setLive(null);
       if (result.ok) {
         setEntries([
           ...history,
@@ -67,6 +96,9 @@ export function Chat({ send }: ChatProps) {
   }
 
   function reset() {
+    requestRef.current?.abort();
+    requestRef.current = null;
+    setLive(null);
     setEntries([]);
     setDraft("");
     setError(null);
@@ -78,6 +110,8 @@ export function Chat({ send }: ChatProps) {
       <div
         role="log"
         aria-live="polite"
+        // Mientras se escribe la respuesta, los lectores de pantalla esperan a tenerla entera.
+        aria-busy={live !== null}
         aria-label="Conversación con el asistente"
         className="min-h-80 space-y-5 p-4 sm:p-6"
       >
@@ -102,13 +136,19 @@ export function Chat({ send }: ChatProps) {
         {entries.map((entry, i) => (
           <Message key={i} entry={entry} />
         ))}
-        {pending && (
+        {live?.text && (
+          <Message
+            entry={{ role: "assistant", content: live.text, toolsUsed: live.toolsUsed }}
+            writing
+          />
+        )}
+        {live && !live.text && (
           <p className="flex items-center gap-2 text-ink-soft">
             <LoaderCircle
               aria-hidden="true"
               className="size-5 animate-spin motion-reduce:animate-none"
             />
-            Consultando las previsiones…
+            {TOOL_ACTIVITY[live.toolsUsed.at(-1) ?? ""] ?? "Consultando las previsiones…"}
           </p>
         )}
         <div ref={endRef} />
@@ -173,7 +213,7 @@ export function Chat({ send }: ChatProps) {
   );
 }
 
-function Message({ entry }: { entry: Entry }) {
+function Message({ entry, writing = false }: { entry: Entry; writing?: boolean }) {
   const mine = entry.role === "user";
   const Icon = mine ? UserRound : Bot;
   const tools = [...new Set(entry.toolsUsed)].map((tool) => TOOL_LABELS[tool]).filter(Boolean);
@@ -195,7 +235,13 @@ function Message({ entry }: { entry: Entry }) {
             {entry.content}
           </p>
         ) : (
-          <div className="inline-block rounded-2xl rounded-tl-md bg-glass px-4 py-3 text-left">
+          <div
+            data-writing={writing || undefined}
+            className={cx(
+              "inline-block rounded-2xl rounded-tl-md bg-glass px-4 py-3 text-left",
+              writing && "writing",
+            )}
+          >
             <RichText text={entry.content} />
           </div>
         )}
