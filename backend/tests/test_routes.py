@@ -159,6 +159,23 @@ async def test_asks_the_router_once_and_reports_failures(
     assert len(calls) == 3
 
 
+async def test_warns_when_a_place_is_far_from_the_road(
+    forecast: ForecastService, incidents: IncidentService, caplog: pytest.LogCaptureFixture
+) -> None:
+    body = {**OSRM_RESPONSE, "waypoints": [{"distance": 12.0}, {"distance": 220.0}]}
+
+    async def fetch(url: str, origin: Any, destination: Any) -> dict[str, Any]:
+        return body
+
+    service = RouteService(forecast, incidents, "https://osrm.example", fetch)
+    assert SANTA_CRUZ is not None and LA_LAGUNA is not None
+    await service.plan(SANTA_CRUZ, LA_LAGUNA, EIGHT)
+    warnings = [r.getMessage() for r in caplog.records if "coordenadas" in r.getMessage()]
+    assert warnings == [
+        "El lugar san-cristobal-de-la-laguna queda a 220 m de la carretera: revisa sus coordenadas"
+    ]
+
+
 @respx.mock
 async def test_fetch_osrm() -> None:
     route = respx.get(url__regex=r"https://osrm\.example/route/v1/driving/.*").respond(

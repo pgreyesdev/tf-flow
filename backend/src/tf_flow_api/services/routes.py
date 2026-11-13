@@ -38,6 +38,9 @@ CLOSURE_PENALTY_MINUTES: Final = 60.0
 INCIDENT_PENALTY_MINUTES: Final = 5.0
 #: Tolerancia al simplificar el trazado que se envía (en grados, unos 10 m).
 SIMPLIFY_DEGREES: Final = 0.0001
+#: Si OSRM tiene que llevar un lugar más lejos que esto hasta la carretera, el punto del lugar
+#: probablemente cae en viales internos (como pasaba con el Aeropuerto Sur) y conviene revisarlo.
+SNAP_WARNING_M: Final = 150.0
 CACHE_SIZE: Final = 256
 DEFAULT_HOUR: Final = 8
 EARTH_RADIUS_M: Final = 6_371_000.0
@@ -206,6 +209,15 @@ class RouteService:
             routes = body.get("routes") if body.get("code") == "Ok" else None
             if not routes:
                 raise RoutingUnavailableError("No se encontró ninguna ruta entre esos lugares")
+            for place, waypoint in zip(
+                (origin, destination), body.get("waypoints", []), strict=False
+            ):
+                if float(waypoint.get("distance", 0.0)) > SNAP_WARNING_M:
+                    logger.warning(
+                        "El lugar %s queda a %.0f m de la carretera: revisa sus coordenadas",
+                        place.id,
+                        float(waypoint["distance"]),
+                    )
             self._cache[key] = routes
             while len(self._cache) > CACHE_SIZE:
                 self._cache.popitem(last=False)
