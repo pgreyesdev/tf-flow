@@ -27,7 +27,6 @@ from tf_flow_api.domain.chat import (
     ReplaceEvent,
     ToolEvent,
 )
-from tf_flow_api.domain.chat import ChatMessage, ChatReply
 from tf_flow_api.domain.incidents import Incident
 from tf_flow_api.domain.routes import Place
 from tf_flow_api.services.forecast import (
